@@ -131,7 +131,7 @@ end
 Main = (function()
 	local Main = {}
 	
-	Main.ModuleList = {"Explorer","Properties","ScriptViewer"}
+	Main.ModuleList = {"Explorer","Properties","ScriptViewer","MultiTool"}
 	Main.Elevated = false
 	Main.MissingEnv = {}
 	Main.Version = "Beta 1.0.0"
@@ -989,6 +989,8 @@ Main = (function()
 		Main.CreateApp({Name = "Properties", IconMap = Main.LargeIcons, Icon = "Properties", Open = true, Window = Properties.Window})
 		
 		Main.CreateApp({Name = "Script Viewer", IconMap = Main.LargeIcons, Icon = "Script_Viewer", Window = ScriptViewer.Window})
+
+		Main.CreateApp({Name = "Multi Tool", Icon = "rbxassetid://3926305904", Window = Apps.MultiTool.Window})
 		
 		Lib.ShowGui(gui)
 	end
@@ -1078,6 +1080,9 @@ Main = (function()
 		Explorer.Init()
 		Properties.Init()
 		ScriptViewer.Init()
+		if Apps.MultiTool and Apps.MultiTool.Init then
+			Apps.MultiTool.Init()
+		end
 		Lib.FastWait()
 		
 		-- Done
