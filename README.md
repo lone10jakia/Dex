@@ -1,8 +1,8 @@
-# Dex - The Freedom Explorer
+# MEMAYBEO HUB - The Freedom Explorer
 ![Logo](/logo.png)
 
 ## Intro
-New Dex was planned to be a debugging suite.
+New MEMAYBEO HUB was planned to be a debugging suite.
 It was discontinued in mid 2021 when grand freedom was achieved, and the script was repurposed to serve the agency's true ambitions.
 
 Witness the most powerful explorer to have ever existed. Bringing unlimited freedom to everyone who has used it. Exploring places that have never been explored before.
@@ -26,7 +26,7 @@ If you feel too lazy to build, I have provided the built version in the releases
 3. The executable script will be created as out.lua
 
 ## High Level Roadmap
-List of stuff that I planned do before I realized that I shouldn't be working on this anymore. If you are really interested in continuing this, you could add this stuff and make New Dex the ultimate utility that I wanted it to be. I might be forgetting stuff since I haven't worked on it for so long.
+List of stuff that I planned do before I realized that I shouldn't be working on this anymore. If you are really interested in continuing this, you could add this stuff and make New MEMAYBEO HUB the ultimate utility that I wanted it to be. I might be forgetting stuff since I haven't worked on it for so long.
 - Terminal
 	* basically command interface with useful commands (non troll or gross) to get around
 	* each command has all its funcs, state contained in a table
@@ -58,21 +58,21 @@ List of stuff that I planned do before I realized that I shouldn't be working on
 	* info bar at bottom (line of error, line count, col count, etc)
 - Reference
 	* interactive api docs for instance props, funcs, etc
-	* docs for some other stuff such as 'Dex' global, plugin api, executor api, etc
+	* docs for some other stuff such as 'MEMAYBEO HUB' global, plugin api, executor api, etc
 	* some tutorials with text, pics, and video (not doing video until roblox removes limit of 3 playing videos)
 - Plugins
 	* Easy way to add some stuff such as right click options, search filters, commands, etc
-	* Access to dex's api for windows, modules, etc
+	* Access to MEMAYBEO HUB's api for windows, modules, etc
 
-## Missing stuff from old Dex
-Features that existed in old Dex that I didn't get to make. These should be the first things you add if you plan to continue / edit this.
+## Missing stuff from old MEMAYBEO HUB
+Features that existed in old MEMAYBEO HUB that I didn't get to make. These should be the first things you add if you plan to continue / edit this.
 - Click to select
 - Saving (instance specific in right click menu, and a menu for whole map saving)
 - Settings menu
 - Tabs in script viewer
 
 ## What is not Included
-Certain features and extensions are private and are reserved for agency use. These are not included in the public release of Dex
+Certain features and extensions are private and are reserved for agency use. These are not included in the public release of MEMAYBEO HUB
 - Binary SaveInstance Module
 - Client <-> Server Bridge
 - Secret Service Panel (Executor + Output Viewer)

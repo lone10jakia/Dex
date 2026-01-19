@@ -212,7 +212,7 @@ local function main()
 		headerGradient.Rotation = 90
 		headerGradient.Parent = header
 
-		local title = createLabel(header,"Dex Multi Tool",18,Enum.Font.GothamBlack)
+		local title = createLabel(header,"MEMAYBEO HUB Multi Tool",18,Enum.Font.GothamBlack)
 		title.Position = UDim2.new(0,16,0,14)
 		title.Size = UDim2.new(1,-32,0,22)
 

@@ -42,7 +42,7 @@ local screenGui = create("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 })
 
-local accessKey = "DEX-ANIME-2024"
+local accessKey = "MEMAYBEO-HUB-2024"
 local animeImageId = "rbxassetid://11924456731"
 
 local keyGate = create("Frame", {
@@ -77,7 +77,7 @@ local keyTitle = create("TextLabel", {
 	Size = UDim2.new(1, -24, 0, 28),
 	Position = UDim2.new(0, 12, 0, 12),
 	Font = Enum.Font.GothamBold,
-	Text = "Dex Access Key",
+	Text = "MEMAYBEO HUB Access Key",
 	TextSize = 20,
 	TextColor3 = theme.text,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -116,7 +116,7 @@ local keyInput = create("TextBox", {
 	Position = UDim2.new(0, 12, 0, 120),
 	Font = Enum.Font.GothamSemibold,
 	Text = "",
-	PlaceholderText = "Enter key (ex: DEX-ANIME-2024)",
+	PlaceholderText = "Enter key (ex: MEMAYBEO-HUB-2024)",
 	TextSize = 13,
 	TextColor3 = theme.text,
 	PlaceholderColor3 = theme.muted,
@@ -204,7 +204,7 @@ local title = create("TextLabel", {
 	Size = UDim2.new(1, -48, 1, 0),
 	Position = UDim2.new(0, 20, 0, 0),
 	Font = Enum.Font.GothamBold,
-	Text = "Dex Multi-Function Menu",
+	Text = "MEMAYBEO HUB Multi-Function Menu",
 	TextSize = 18,
 	TextColor3 = theme.text,
 	TextXAlignment = Enum.TextXAlignment.Left,
