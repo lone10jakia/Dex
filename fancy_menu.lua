@@ -42,12 +42,135 @@ local screenGui = create("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 })
 
+local accessKey = "DEX-ANIME-2024"
+local animeImageId = "rbxassetid://11924456731"
+
+local keyGate = create("Frame", {
+	Name = "KeyGate",
+	Size = UDim2.new(1, 0, 1, 0),
+	BackgroundColor3 = Color3.fromRGB(12, 14, 20),
+	BackgroundTransparency = 0.05,
+	Parent = screenGui,
+})
+
+local keyPanel = create("Frame", {
+	Size = UDim2.new(0, 420, 0, 260),
+	Position = UDim2.new(0.5, -210, 0.5, -130),
+	BackgroundColor3 = theme.panel,
+	BorderSizePixel = 0,
+	Parent = keyGate,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 14),
+	Parent = keyPanel,
+})
+
+create("UIStroke", {
+	Color = theme.stroke,
+	Thickness = 1,
+	Parent = keyPanel,
+})
+
+local keyTitle = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 28),
+	Position = UDim2.new(0, 12, 0, 12),
+	Font = Enum.Font.GothamBold,
+	Text = "Dex Access Key",
+	TextSize = 20,
+	TextColor3 = theme.text,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = keyPanel,
+})
+
+local keySubtitle = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 18),
+	Position = UDim2.new(0, 12, 0, 44),
+	Font = Enum.Font.Gotham,
+	Text = "Enter the key to unlock the menu",
+	TextSize = 12,
+	TextColor3 = theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = keyPanel,
+})
+
+local keyArt = create("ImageLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(0, 140, 0, 140),
+	Position = UDim2.new(1, -160, 0, 70),
+	Image = animeImageId,
+	ScaleType = Enum.ScaleType.Crop,
+	Parent = keyPanel,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 10),
+	Parent = keyArt,
+})
+
+local keyInput = create("TextBox", {
+	BackgroundColor3 = theme.panelDark,
+	Size = UDim2.new(1, -24, 0, 36),
+	Position = UDim2.new(0, 12, 0, 120),
+	Font = Enum.Font.GothamSemibold,
+	Text = "",
+	PlaceholderText = "Enter key (ex: DEX-ANIME-2024)",
+	TextSize = 13,
+	TextColor3 = theme.text,
+	PlaceholderColor3 = theme.muted,
+	ClearTextOnFocus = false,
+	Parent = keyPanel,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 8),
+	Parent = keyInput,
+})
+
+create("UIStroke", {
+	Color = theme.stroke,
+	Thickness = 1,
+	Parent = keyInput,
+})
+
+local keyStatus = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 18),
+	Position = UDim2.new(0, 12, 0, 164),
+	Font = Enum.Font.Gotham,
+	Text = "Key required.",
+	TextSize = 12,
+	TextColor3 = theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = keyPanel,
+})
+
+local keyButton = create("TextButton", {
+	BackgroundColor3 = theme.accent,
+	Size = UDim2.new(0, 140, 0, 34),
+	Position = UDim2.new(0, 12, 1, -50),
+	Font = Enum.Font.GothamBold,
+	Text = "Unlock",
+	TextSize = 13,
+	TextColor3 = theme.text,
+	AutoButtonColor = false,
+	Parent = keyPanel,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 8),
+	Parent = keyButton,
+})
+
 local main = create("Frame", {
 	Name = "Main",
 	Size = UDim2.new(0, 520, 0, 340),
 	Position = UDim2.new(0.5, -260, 0.5, -170),
 	BackgroundColor3 = theme.panel,
 	BorderSizePixel = 0,
+	Visible = false,
 	Parent = screenGui,
 })
 
@@ -139,6 +262,21 @@ local content = create("Frame", {
 	Position = UDim2.new(0, 160, 0, 48),
 	BackgroundTransparency = 1,
 	Parent = main,
+})
+
+local heroArt = create("ImageLabel", {
+	Name = "HeroArt",
+	BackgroundTransparency = 1,
+	Size = UDim2.new(0, 110, 0, 110),
+	Position = UDim2.new(0, 16, 0, 12),
+	Image = animeImageId,
+	ScaleType = Enum.ScaleType.Crop,
+	Parent = tabBar,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 10),
+	Parent = heroArt,
 })
 
 local function createSection(parent, titleText)
@@ -282,6 +420,7 @@ end
 local playerPage = createTab("Player")
 local worldPage = createTab("World")
 local utilityPage = createTab("Utility")
+local pvpPage = createTab("PVP")
 
 tabs.Player.BackgroundColor3 = theme.accent
 pages.Player.Visible = true
@@ -390,6 +529,42 @@ copyPosButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- PVP section (UI only)
+local pvpSection = createSection(pvpPage, "PVP Toolkit")
+local pvpLayout = create("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	FillDirection = Enum.FillDirection.Vertical,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Parent = pvpSection,
+})
+pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local pvpStatus = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 20),
+	Font = Enum.Font.Gotham,
+	Text = "Status: Idle",
+	TextSize = 12,
+	TextColor3 = theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	Parent = pvpSection,
+})
+
+local pvpReady = false
+local pvpToggle = createButton(pvpSection, "Enable PVP Mode")
+pvpToggle.Size = UDim2.new(0, 180, 0, 34)
+pvpToggle.MouseButton1Click:Connect(function()
+	pvpReady = not pvpReady
+	if pvpReady then
+		pvpStatus.Text = "Status: Ready for PVP"
+		pvpToggle.Text = "Disable PVP Mode"
+	else
+		pvpStatus.Text = "Status: Idle"
+		pvpToggle.Text = "Enable PVP Mode"
+	end
+end)
+
 local function setVisible(state)
 	main.Visible = state
 end
@@ -398,12 +573,26 @@ closeButton.MouseButton1Click:Connect(function()
 	setVisible(false)
 end)
 
+keyButton.MouseButton1Click:Connect(function()
+	if keyInput.Text == accessKey then
+		keyStatus.Text = "Access granted."
+		keyStatus.TextColor3 = Color3.fromRGB(134, 239, 172)
+		main.Visible = true
+		keyGate.Visible = false
+	else
+		keyStatus.Text = "Invalid key. Try again."
+		keyStatus.TextColor3 = Color3.fromRGB(248, 113, 113)
+	end
+end)
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.RightShift then
-		setVisible(not main.Visible)
+		if not keyGate.Visible then
+			setVisible(not main.Visible)
+		end
 	end
 end)
 
