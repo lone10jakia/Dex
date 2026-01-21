@@ -44,8 +44,15 @@ end
 
 local persisted = loadSettings()
 
+local GUI_NAME = "MEMAYBEO_HUB_V3"
+local existingGui = game.CoreGui:FindFirstChild(GUI_NAME)
+if existingGui then
+	existingGui:Destroy()
+end
+
 -- GUI
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = GUI_NAME
 ScreenGui.ResetOnSpawn = false
 
 local ToggleButton = Instance.new("TextButton")
@@ -311,7 +318,12 @@ local function findToolByName(targetName)
 		end
 	end
 
-	for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+	local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+	if not backpack then
+		return nil
+	end
+
+	for _, tool in ipairs(backpack:GetChildren()) do
 		if tool:IsA("Tool") and tool.Name:lower() == normalized then
 			return tool
 		end
@@ -385,10 +397,13 @@ task.spawn(function()
 			if current and isHealTool(current) then
 				heal = current
 			else
-				for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do
-					if v:IsA("Tool") and isHealTool(v) then
-						heal = v
-						break
+				local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+				if backpack then
+					for _, v in ipairs(backpack:GetChildren()) do
+						if v:IsA("Tool") and isHealTool(v) then
+							heal = v
+							break
+						end
 					end
 				end
 			end
