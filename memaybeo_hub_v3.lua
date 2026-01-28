@@ -4,8 +4,6 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 
 local SAVE_FILE = "memaybeo_hub_v3_settings.json"
@@ -61,7 +59,7 @@ ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 130, 0, 320)
+MainFrame.Size = UDim2.new(0, 130, 0, 385)
 MainFrame.Position = UDim2.new(1, 150, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Visible = false
@@ -97,14 +95,15 @@ end
 local SpinButton = makeButton(25, "🔄 Xoay:")
 local SpeedButton = makeButton(60, "👟 Tăng tốc:")
 local HealthButton = makeButton(95, "❤️ Thanh máu:")
-local HitBoxButton = makeButton(130, "📦 HitBox:")
+local StunButton = makeButton(130, "🥴 Choáng:")
 local AutoAttackButton = makeButton(165, "⚔️ Auto Đánh:")
 local FixLagButton = makeButton(200, "⚡ FixLag:")
-local AutoBangButton = makeButton(235, "🤕 Auto Băng:")
+local RespawnButton = makeButton(235, "♻️ Hồi sinh:")
+local AutoBangButton = makeButton(270, "🤕 Auto Băng:")
 
 local WeaponLabel = Instance.new("TextLabel")
 WeaponLabel.Size = UDim2.new(0, 110, 0, 16)
-WeaponLabel.Position = UDim2.new(0, 10, 0, 270)
+WeaponLabel.Position = UDim2.new(0, 10, 0, 305)
 WeaponLabel.BackgroundTransparency = 1
 WeaponLabel.Text = "🎯 Vũ khí:"
 WeaponLabel.TextSize = 12
@@ -115,7 +114,7 @@ WeaponLabel.Parent = MainFrame
 
 local WeaponInput = Instance.new("TextBox")
 WeaponInput.Size = UDim2.new(0, 110, 0, 24)
-WeaponInput.Position = UDim2.new(0, 10, 0, 288)
+WeaponInput.Position = UDim2.new(0, 10, 0, 323)
 WeaponInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 WeaponInput.Text = ""
 WeaponInput.PlaceholderText = "Tên vũ khí"
@@ -126,15 +125,29 @@ WeaponInput.ClearTextOnFocus = false
 WeaponInput.Parent = MainFrame
 Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 
+local WeaponSuggestion = Instance.new("TextLabel")
+WeaponSuggestion.Size = UDim2.new(0, 110, 0, 14)
+WeaponSuggestion.Position = UDim2.new(0, 10, 0, 350)
+WeaponSuggestion.BackgroundTransparency = 1
+WeaponSuggestion.Text = ""
+WeaponSuggestion.TextSize = 10
+WeaponSuggestion.Font = Enum.Font.Gotham
+WeaponSuggestion.TextColor3 = Color3.fromRGB(120, 255, 180)
+WeaponSuggestion.TextXAlignment = Enum.TextXAlignment.Left
+WeaponSuggestion.Parent = MainFrame
+
 -- Variables
 local spinActive = persisted.spinActive or false
 local speedBoost = persisted.speedBoost or false
 local healthVisible = persisted.healthVisible or false
-local hitBoxActive = persisted.hitBoxActive or false
+local stunActive = persisted.stunActive or false
+local stunBusy = false
+local fastRespawn = persisted.fastRespawn or false
 local autoAttack = persisted.autoAttack or false
 local fixLag = persisted.fixLag or false
 local autoBang = persisted.autoBang or false
 local preferredWeaponName = persisted.preferredWeaponName or ""
+local suggestedWeaponName = ""
 local autoWeaponCapture = persisted.autoWeaponCapture
 if autoWeaponCapture == nil then
 	autoWeaponCapture = true
@@ -142,14 +155,16 @@ end
 
 local spinSpeed = 2500
 local normalSpeed, boostedSpeed = 16, 32
-local hitBoxSize = Vector3.new(7, 7, 7)
+local stunDuration = 0.6
+local stunSpeed = 8
 
 local function persistState()
 	saveSettings({
 		spinActive = spinActive,
 		speedBoost = speedBoost,
 		healthVisible = healthVisible,
-		hitBoxActive = hitBoxActive,
+		stunActive = stunActive,
+		fastRespawn = fastRespawn,
 		autoAttack = autoAttack,
 		fixLag = fixLag,
 		autoBang = autoBang,
@@ -160,6 +175,52 @@ end
 
 local function setToggleText(button, label, value)
 	button.Text = label .. " " .. (value and "ON" or "OFF")
+end
+
+local function getAllToolNames()
+	local names = {}
+	local seen = {}
+	local char = LocalPlayer.Character
+
+	local function collect(container)
+		if not container then
+			return
+		end
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("Tool") and not seen[child.Name] then
+				seen[child.Name] = true
+				table.insert(names, child.Name)
+			end
+		end
+	end
+
+	collect(char)
+	collect(LocalPlayer.Backpack)
+	return names
+end
+
+local function findWeaponSuggestion(inputText)
+	if inputText == "" then
+		return ""
+	end
+
+	local normalized = inputText:lower()
+	for _, name in ipairs(getAllToolNames()) do
+		if name:lower():sub(1, #normalized) == normalized then
+			return name
+		end
+	end
+
+	return ""
+end
+
+local function updateWeaponSuggestion()
+	suggestedWeaponName = findWeaponSuggestion(WeaponInput.Text)
+	if suggestedWeaponName ~= "" and WeaponInput.Text:lower() ~= suggestedWeaponName:lower() then
+		WeaponSuggestion.Text = "Gợi ý: " .. suggestedWeaponName
+	else
+		WeaponSuggestion.Text = ""
+	end
 end
 
 ------------------------------------------------------------------------
@@ -183,6 +244,9 @@ end)
 local function applySpeed()
 	local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
 	if hum then
+		if stunActive and stunBusy then
+			return
+		end
 		hum.WalkSpeed = speedBoost and boostedSpeed or normalSpeed
 	end
 end
@@ -195,7 +259,7 @@ SpeedButton.MouseButton1Click:Connect(function()
 end)
 
 task.spawn(function()
-	while task.wait(0.5) do
+	while task.wait(0.75) do
 		if speedBoost then
 			applySpeed()
 		end
@@ -205,6 +269,18 @@ end)
 ------------------------------------------------------------------------
 -- HEALTH BAR
 ------------------------------------------------------------------------
+local healthConnections = {}
+
+local function removeHealthBar(char)
+	local head = char:FindFirstChild("Head")
+	if head then
+		local existing = head:FindFirstChild("HealthDisplay")
+		if existing then
+			existing:Destroy()
+		end
+	end
+end
+
 local function addHealthBar(char)
 	if not healthVisible then
 		return
@@ -245,46 +321,180 @@ local function addHealthBar(char)
 		hpText.Text = math.floor(h) .. " / " .. math.floor(hum.MaxHealth)
 	end)
 end
-HealthButton.MouseButton1Click:Connect(function()
-	healthVisible = not healthVisible
-	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			addHealthBar(plr.Character)
-		end
+
+local function connectHealthForPlayer(plr)
+	if healthConnections[plr] then
+		return
 	end
-	persistState()
-end)
-------------------------------------------------------------------------
--- HITBOX
-------------------------------------------------------------------------
-local function setHitBox(char, size)
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		hrp.Size = size
-		hrp.Transparency = 0.7
-		hrp.Color = Color3.fromRGB(255, 0, 0)
-		hrp.Material = Enum.Material.Neon
-		hrp.CanCollide = false
+
+	local connection = plr.CharacterAdded:Connect(function(char)
+		task.wait(0.1)
+		addHealthBar(char)
+	end)
+	healthConnections[plr] = connection
+	if plr.Character then
+		addHealthBar(plr.Character)
 	end
 end
 
-HitBoxButton.MouseButton1Click:Connect(function()
-	hitBoxActive = not hitBoxActive
-	setToggleText(HitBoxButton, "📦 HitBox:", hitBoxActive)
+local function disconnectHealthConnections()
+	for plr, conn in pairs(healthConnections) do
+		conn:Disconnect()
+		healthConnections[plr] = nil
+		if plr.Character then
+			removeHealthBar(plr.Character)
+		end
+	end
+end
+
+HealthButton.MouseButton1Click:Connect(function()
+	healthVisible = not healthVisible
+	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
+	if healthVisible then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			connectHealthForPlayer(plr)
+		end
+	else
+		disconnectHealthConnections()
+	end
 	persistState()
 end)
 
-task.spawn(function()
-	while task.wait(0.3) do
-		if hitBoxActive then
-			for _, pl in ipairs(Players:GetPlayers()) do
-				if pl ~= LocalPlayer and pl.Character then
-					setHitBox(pl.Character, hitBoxSize)
-				end
-			end
+Players.PlayerAdded:Connect(function(plr)
+	if healthVisible then
+		connectHealthForPlayer(plr)
+	end
+end)
+
+------------------------------------------------------------------------
+-- STUN
+------------------------------------------------------------------------
+local stunConnection = nil
+
+local function desiredSpeed()
+	return speedBoost and boostedSpeed or normalSpeed
+end
+
+local function showStunEffect(char)
+	if not char then
+		return
+	end
+
+	local existing = char:FindFirstChild("StunEffect")
+	if existing then
+		existing:Destroy()
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "StunEffect"
+	highlight.FillColor = Color3.fromRGB(255, 220, 90)
+	highlight.OutlineColor = Color3.fromRGB(255, 120, 60)
+	highlight.FillTransparency = 0.4
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = char
+
+	task.delay(stunDuration, function()
+		if highlight and highlight.Parent then
+			highlight:Destroy()
+		end
+	end)
+end
+
+local function applyStun(hum)
+	if stunBusy then
+		return
+	end
+	stunBusy = true
+	local original = desiredSpeed()
+	local originalJump = hum.JumpPower
+	hum.WalkSpeed = math.max(stunSpeed, original * 0.5)
+	hum.JumpPower = math.max(25, originalJump * 0.6)
+	showStunEffect(hum.Parent)
+	task.delay(stunDuration, function()
+		if hum and hum.Parent then
+			hum.WalkSpeed = desiredSpeed()
+			hum.JumpPower = originalJump
+		end
+		stunBusy = false
+	end)
+end
+
+local function setupStun(char)
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		return
+	end
+
+	local lastHealth = hum.Health
+	if stunConnection then
+		stunConnection:Disconnect()
+	end
+
+	stunConnection = hum.HealthChanged:Connect(function(current)
+		if not stunActive then
+			lastHealth = current
+			return
+		end
+
+		if current < lastHealth then
+			applyStun(hum)
+		end
+		lastHealth = current
+	end)
+end
+
+StunButton.MouseButton1Click:Connect(function()
+	stunActive = not stunActive
+	setToggleText(StunButton, "🥴 Choáng:", stunActive)
+	if stunActive and LocalPlayer.Character then
+		setupStun(LocalPlayer.Character)
+	else
+		if stunConnection then
+			stunConnection:Disconnect()
+			stunConnection = nil
+		end
+		stunBusy = false
+		applySpeed()
+	end
+	persistState()
+end)
+
+------------------------------------------------------------------------
+-- FAST RESPAWN
+------------------------------------------------------------------------
+local respawnConnection = nil
+
+local function setupFastRespawn(char)
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		return
+	end
+
+	if respawnConnection then
+		respawnConnection:Disconnect()
+	end
+
+	respawnConnection = hum.Died:Connect(function()
+		if fastRespawn then
+			task.wait(0.1)
+			LocalPlayer:LoadCharacter()
+		end
+	end)
+end
+
+RespawnButton.MouseButton1Click:Connect(function()
+	fastRespawn = not fastRespawn
+	setToggleText(RespawnButton, "♻️ Hồi sinh:", fastRespawn)
+	if fastRespawn and LocalPlayer.Character then
+		setupFastRespawn(LocalPlayer.Character)
+	else
+		if respawnConnection then
+			respawnConnection:Disconnect()
+			respawnConnection = nil
 		end
 	end
+	persistState()
 end)
 
 ------------------------------------------------------------------------
@@ -297,7 +507,7 @@ AutoAttackButton.MouseButton1Click:Connect(function()
 end)
 
 task.spawn(function()
-	while task.wait(0.05) do
+	while task.wait(0.1) do
 		if autoAttack and LocalPlayer.Character then
 			local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
 			if tool then
@@ -359,6 +569,7 @@ local function syncPreferredWeaponFromTool(tool)
 
 	preferredWeaponName = tool.Name
 	WeaponInput.Text = preferredWeaponName
+	updateWeaponSuggestion()
 	persistState()
 end
 
@@ -374,7 +585,7 @@ local function waitForEquipped(char, tool, timeout)
 end
 
 task.spawn(function()
-	while task.wait(0.2) do
+	while task.wait(0.3) do
 		if autoBang and LocalPlayer.Character then
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
@@ -427,6 +638,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	char.ChildAdded:Connect(function(child)
 		syncPreferredWeaponFromTool(child)
 	end)
+
+	if stunActive then
+		setupStun(char)
+	end
+
+	if fastRespawn then
+		setupFastRespawn(char)
+	end
 end)
 
 ------------------------------------------------------------------------
@@ -460,11 +679,13 @@ local function applyInitialState()
 	setToggleText(SpinButton, "🔄 Xoay:", spinActive)
 	setToggleText(SpeedButton, "👟 Tăng tốc:", speedBoost)
 	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
-	setToggleText(HitBoxButton, "📦 HitBox:", hitBoxActive)
+	setToggleText(StunButton, "🥴 Choáng:", stunActive)
+	setToggleText(RespawnButton, "♻️ Hồi sinh:", fastRespawn)
 	setToggleText(AutoAttackButton, "⚔️ Auto Đánh:", autoAttack)
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
 	WeaponInput.Text = preferredWeaponName
+	updateWeaponSuggestion()
 
 	if speedBoost then
 		applySpeed()
@@ -472,17 +693,33 @@ local function applyInitialState()
 
 	if healthVisible then
 		for _, plr in ipairs(Players:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character then
-				addHealthBar(plr.Character)
-			end
+			connectHealthForPlayer(plr)
 		end
+	end
+
+	if stunActive and LocalPlayer.Character then
+		setupStun(LocalPlayer.Character)
+	end
+
+	if fastRespawn and LocalPlayer.Character then
+		setupFastRespawn(LocalPlayer.Character)
 	end
 end
 
 applyInitialState()
 
+WeaponInput:GetPropertyChangedSignal("Text"):Connect(function()
+	updateWeaponSuggestion()
+end)
+
 WeaponInput.FocusLost:Connect(function()
+	if suggestedWeaponName ~= "" and WeaponInput.Text ~= "" then
+		if suggestedWeaponName:lower():sub(1, #WeaponInput.Text:lower()) == WeaponInput.Text:lower() then
+			WeaponInput.Text = suggestedWeaponName
+		end
+	end
 	preferredWeaponName = WeaponInput.Text
+	updateWeaponSuggestion()
 	persistState()
 end)
 
