@@ -97,7 +97,7 @@ end
 local SpinButton = makeButton(25, "🔄 Xoay:")
 local SpeedButton = makeButton(60, "👟 Tăng tốc:")
 local HealthButton = makeButton(95, "❤️ Thanh máu:")
-local HitBoxButton = makeButton(130, "📦 HitBox:")
+local StunButton = makeButton(130, "🥴 Choáng:")
 local AutoAttackButton = makeButton(165, "⚔️ Auto Đánh:")
 local FixLagButton = makeButton(200, "⚡ FixLag:")
 local AutoBangButton = makeButton(235, "🤕 Auto Băng:")
@@ -130,7 +130,8 @@ Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 local spinActive = persisted.spinActive or false
 local speedBoost = persisted.speedBoost or false
 local healthVisible = persisted.healthVisible or false
-local hitBoxActive = persisted.hitBoxActive or false
+local stunActive = persisted.stunActive or false
+local stunBusy = false
 local autoAttack = persisted.autoAttack or false
 local fixLag = persisted.fixLag or false
 local autoBang = persisted.autoBang or false
@@ -142,14 +143,15 @@ end
 
 local spinSpeed = 2500
 local normalSpeed, boostedSpeed = 16, 32
-local hitBoxSize = Vector3.new(7, 7, 7)
+local stunDuration = 0.6
+local stunSpeed = 8
 
 local function persistState()
 	saveSettings({
 		spinActive = spinActive,
 		speedBoost = speedBoost,
 		healthVisible = healthVisible,
-		hitBoxActive = hitBoxActive,
+		stunActive = stunActive,
 		autoAttack = autoAttack,
 		fixLag = fixLag,
 		autoBang = autoBang,
@@ -183,6 +185,9 @@ end)
 local function applySpeed()
 	local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
 	if hum then
+		if stunActive and stunBusy then
+			return
+		end
 		hum.WalkSpeed = speedBoost and boostedSpeed or normalSpeed
 	end
 end
@@ -205,6 +210,18 @@ end)
 ------------------------------------------------------------------------
 -- HEALTH BAR
 ------------------------------------------------------------------------
+local healthConnections = {}
+
+local function removeHealthBar(char)
+	local head = char:FindFirstChild("Head")
+	if head then
+		local existing = head:FindFirstChild("HealthDisplay")
+		if existing then
+			existing:Destroy()
+		end
+	end
+end
+
 local function addHealthBar(char)
 	if not healthVisible then
 		return
@@ -245,46 +262,113 @@ local function addHealthBar(char)
 		hpText.Text = math.floor(h) .. " / " .. math.floor(hum.MaxHealth)
 	end)
 end
-HealthButton.MouseButton1Click:Connect(function()
-	healthVisible = not healthVisible
-	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			addHealthBar(plr.Character)
-		end
+
+local function connectHealthForPlayer(plr)
+	if healthConnections[plr] then
+		return
 	end
-	persistState()
-end)
-------------------------------------------------------------------------
--- HITBOX
-------------------------------------------------------------------------
-local function setHitBox(char, size)
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		hrp.Size = size
-		hrp.Transparency = 0.7
-		hrp.Color = Color3.fromRGB(255, 0, 0)
-		hrp.Material = Enum.Material.Neon
-		hrp.CanCollide = false
+
+	local connection = plr.CharacterAdded:Connect(function(char)
+		task.wait(0.1)
+		addHealthBar(char)
+	end)
+	healthConnections[plr] = connection
+	if plr.Character then
+		addHealthBar(plr.Character)
 	end
 end
 
-HitBoxButton.MouseButton1Click:Connect(function()
-	hitBoxActive = not hitBoxActive
-	setToggleText(HitBoxButton, "📦 HitBox:", hitBoxActive)
+local function disconnectHealthConnections()
+	for plr, conn in pairs(healthConnections) do
+		conn:Disconnect()
+		healthConnections[plr] = nil
+		if plr.Character then
+			removeHealthBar(plr.Character)
+		end
+	end
+end
+
+HealthButton.MouseButton1Click:Connect(function()
+	healthVisible = not healthVisible
+	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
+	if healthVisible then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			connectHealthForPlayer(plr)
+		end
+	else
+		disconnectHealthConnections()
+	end
 	persistState()
 end)
 
-task.spawn(function()
-	while task.wait(0.3) do
-		if hitBoxActive then
-			for _, pl in ipairs(Players:GetPlayers()) do
-				if pl ~= LocalPlayer and pl.Character then
-					setHitBox(pl.Character, hitBoxSize)
-				end
-			end
-		end
+Players.PlayerAdded:Connect(function(plr)
+	if healthVisible then
+		connectHealthForPlayer(plr)
 	end
+end)
+
+------------------------------------------------------------------------
+-- STUN
+------------------------------------------------------------------------
+local stunConnection = nil
+
+local function desiredSpeed()
+	return speedBoost and boostedSpeed or normalSpeed
+end
+
+local function applyStun(hum)
+	if stunBusy then
+		return
+	end
+	stunBusy = true
+	local original = desiredSpeed()
+	hum.WalkSpeed = math.max(stunSpeed, original * 0.5)
+	task.delay(stunDuration, function()
+		if hum and hum.Parent then
+			hum.WalkSpeed = desiredSpeed()
+		end
+		stunBusy = false
+	end)
+end
+
+local function setupStun(char)
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		return
+	end
+
+	local lastHealth = hum.Health
+	if stunConnection then
+		stunConnection:Disconnect()
+	end
+
+	stunConnection = hum.HealthChanged:Connect(function(current)
+		if not stunActive then
+			lastHealth = current
+			return
+		end
+
+		if current < lastHealth then
+			applyStun(hum)
+		end
+		lastHealth = current
+	end)
+end
+
+StunButton.MouseButton1Click:Connect(function()
+	stunActive = not stunActive
+	setToggleText(StunButton, "🥴 Choáng:", stunActive)
+	if stunActive and LocalPlayer.Character then
+		setupStun(LocalPlayer.Character)
+	else
+		if stunConnection then
+			stunConnection:Disconnect()
+			stunConnection = nil
+		end
+		stunBusy = false
+		applySpeed()
+	end
+	persistState()
 end)
 
 ------------------------------------------------------------------------
@@ -427,6 +511,10 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	char.ChildAdded:Connect(function(child)
 		syncPreferredWeaponFromTool(child)
 	end)
+
+	if stunActive then
+		setupStun(char)
+	end
 end)
 
 ------------------------------------------------------------------------
@@ -460,7 +548,7 @@ local function applyInitialState()
 	setToggleText(SpinButton, "🔄 Xoay:", spinActive)
 	setToggleText(SpeedButton, "👟 Tăng tốc:", speedBoost)
 	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
-	setToggleText(HitBoxButton, "📦 HitBox:", hitBoxActive)
+	setToggleText(StunButton, "🥴 Choáng:", stunActive)
 	setToggleText(AutoAttackButton, "⚔️ Auto Đánh:", autoAttack)
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
@@ -472,10 +560,12 @@ local function applyInitialState()
 
 	if healthVisible then
 		for _, plr in ipairs(Players:GetPlayers()) do
-			if plr ~= LocalPlayer and plr.Character then
-				addHealthBar(plr.Character)
-			end
+			connectHealthForPlayer(plr)
 		end
+	end
+
+	if stunActive and LocalPlayer.Character then
+		setupStun(LocalPlayer.Character)
 	end
 end
 
