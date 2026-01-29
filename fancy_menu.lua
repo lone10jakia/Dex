@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -24,6 +25,27 @@ local theme = {
 	stroke = Color3.fromRGB(55, 60, 75),
 }
 
+local autoAimEnabled = false
+local autoAimConnection
+local locatorEnabled = false
+local locatorConnection
+local locatorBillboards = {}
+local ignoreTeamEnabled = true
+local wallbangEnabled = true
+local infiniteAmmoEnabled = false
+local fastReloadEnabled = false
+local ammoConnection
+local ammoOriginals = {}
+local minimized = false
+local silentAimEnabled = false
+local silentAimHooked = false
+local originalNamecall
+local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
+local aimPartIndex = 1
+local hitboxEnabled = false
+local hitboxConnection
+local hitboxOriginals = {}
+
 local function create(className, props)
 	local inst = Instance.new(className)
 	for key, value in pairs(props or {}) do
@@ -36,13 +58,502 @@ local function tween(obj, props, time)
 	TweenService:Create(obj, TweenInfo.new(time or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
+local function getCharacter()
+	return player.Character
+end
+
+local function getRoot()
+	local character = getCharacter()
+	if not character then
+		return nil
+	end
+	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function isCharacterAlive()
+	local character = getCharacter()
+	if not character then
+		return false
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	return humanoid and humanoid.Health > 0
+end
+
+local function getHeadPart(targetPlayer)
+	if not targetPlayer then
+		return nil
+	end
+
+	local character = targetPlayer.Character
+	if not character then
+		return nil
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		return nil
+	end
+
+	local head = character:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		return head
+	end
+
+	local primary = character.PrimaryPart
+	if primary and primary:IsA("BasePart") then
+		return primary
+	end
+
+	return nil
+end
+
+local function getAimPart(targetPlayer)
+	if not targetPlayer then
+		return nil
+	end
+
+	local character = targetPlayer.Character
+	if not character then
+		return nil
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		return nil
+	end
+
+	local partName = aimParts[aimPartIndex] or "Head"
+	local part = character:FindFirstChild(partName)
+	if part and part:IsA("BasePart") then
+		return part
+	end
+
+	return getHeadPart(targetPlayer)
+end
+
+local function getCandidatePlayers()
+	local candidates = {}
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other ~= player and (not ignoreTeamEnabled or other.Team ~= player.Team) then
+			table.insert(candidates, other)
+		end
+	end
+	return candidates
+end
+
+local function getNearestPlayer()
+	local root = getRoot()
+	local origin = root and root.Position
+	if not origin then
+		local camera = workspace.CurrentCamera
+		origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
+	end
+
+	local nearest
+	local nearestDistance
+	for _, other in ipairs(getCandidatePlayers()) do
+		local part = getAimPart(other)
+		if part then
+			local distance = (part.Position - origin).Magnitude
+			if not nearestDistance or distance < nearestDistance then
+				nearest = other
+				nearestDistance = distance
+			end
+		end
+	end
+
+	if not nearest then
+		return nil, "Không tìm thấy người chơi phù hợp."
+	end
+
+	return nearest, nearestDistance
+end
+
+local function createLocatorBillboard(targetPlayer, head)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "FancyLocator"
+	billboard.Size = UDim2.new(0, 160, 0, 34)
+	billboard.StudsOffset = Vector3.new(0, 2.6, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = head
+
+	local frame = Instance.new("Frame")
+	frame.BackgroundColor3 = theme.panel
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.Parent = billboard
+
+	create("UICorner", {
+		CornerRadius = UDim.new(0, 6),
+		Parent = frame,
+	})
+
+	create("UIStroke", {
+		Color = theme.stroke,
+		Thickness = 1,
+		Parent = frame,
+	})
+
+	local label = create("TextLabel", {
+		Name = "NameLabel",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -8, 1, 0),
+		Position = UDim2.new(0, 4, 0, 0),
+		Font = Enum.Font.GothamBold,
+		Text = targetPlayer.Name,
+		TextSize = 12,
+		TextColor3 = theme.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = frame,
+	})
+
+	locatorBillboards[targetPlayer] = billboard
+	return label
+end
+
+local function clearLocatorBillboards()
+	for target, billboard in pairs(locatorBillboards) do
+		if billboard then
+			billboard:Destroy()
+		end
+		locatorBillboards[target] = nil
+	end
+end
+
+local function setLocatorEnabled(enabled, statusLabel)
+	locatorEnabled = enabled
+	if locatorConnection then
+		locatorConnection:Disconnect()
+		locatorConnection = nil
+	end
+	clearLocatorBillboards()
+
+	if not enabled then
+		if statusLabel then
+			statusLabel.Text = "Status: Locator Off"
+		end
+		return
+	end
+
+	if statusLabel then
+		statusLabel.Text = "Status: Locating players..."
+	end
+	locatorConnection = RunService.RenderStepped:Connect(function()
+		local origin
+		local root = getRoot()
+		if root then
+			origin = root.Position
+		else
+			local camera = workspace.CurrentCamera
+			origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
+		end
+
+		local candidates = getCandidatePlayers()
+			for _, other in ipairs(candidates) do
+				local part = getAimPart(other)
+				if part then
+					if not locatorBillboards[other] or not locatorBillboards[other].Parent then
+						createLocatorBillboard(other, part)
+					end
+					local billboard = locatorBillboards[other]
+					local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
+					if label then
+						local distance = (part.Position - origin).Magnitude
+						label.Text = string.format("%s • %.0fm", other.Name, distance)
+					end
+				end
+		end
+
+		for target, billboard in pairs(locatorBillboards) do
+			if not table.find(candidates, target) then
+				if billboard then
+					billboard:Destroy()
+				end
+				locatorBillboards[target] = nil
+			end
+		end
+	end)
+end
+
+local function setAutoAim(enabled, statusLabel)
+	autoAimEnabled = enabled
+	if autoAimConnection then
+		autoAimConnection:Disconnect()
+		autoAimConnection = nil
+	end
+
+	if not enabled then
+		if statusLabel then
+			statusLabel.Text = "Status: Auto Aim Off"
+		end
+		return
+	end
+
+	if statusLabel then
+		statusLabel.Text = "Status: Auto Aim Active"
+	end
+
+	autoAimConnection = RunService.RenderStepped:Connect(function()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		if not isCharacterAlive() then
+			if statusLabel then
+				statusLabel.Text = "Status: Waiting for respawn"
+			end
+			return
+		end
+
+		local root = getRoot()
+		if not root then
+			return
+		end
+
+		local target, distanceOrError = getNearestPlayer()
+		if not target then
+			if statusLabel then
+				statusLabel.Text = distanceOrError or "Status: No target"
+			end
+			return
+		end
+
+		local part = getAimPart(target)
+		if not part then
+			return
+		end
+
+		if not wallbangEnabled and workspace and workspace.Raycast then
+			local origin = camera.CFrame.Position
+			local direction = part.Position - origin
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+			local character = getCharacter()
+			if character then
+				rayParams.FilterDescendantsInstances = {character}
+			else
+				rayParams.FilterDescendantsInstances = {}
+			end
+			local result = workspace:Raycast(origin, direction, rayParams)
+			if result and result.Instance and not result.Instance:IsDescendantOf(part.Parent) then
+				if statusLabel then
+					statusLabel.Text = "Status: Target blocked"
+				end
+				return
+			end
+		end
+
+		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, part.Position)
+		if statusLabel then
+			statusLabel.Text = string.format("Status: Locked %s (%.0fm)", target.Name, distanceOrError)
+		end
+	end)
+end
+
+local AMMO_VALUE_NAMES = {
+	Ammo = true,
+	AmmoInClip = true,
+	Clip = true,
+	ClipAmmo = true,
+	CurrentAmmo = true,
+	ReserveAmmo = true,
+	StoredAmmo = true,
+}
+
+local MAX_AMMO_NAMES = {
+	MaxAmmo = true,
+	MaxClip = true,
+	ClipSize = true,
+	MagazineSize = true,
+}
+
+local RELOAD_VALUE_NAMES = {
+	ReloadTime = true,
+	ReloadSpeed = true,
+	ReloadDuration = true,
+}
+
+local function findMaxAmmo(tool)
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+			if MAX_AMMO_NAMES[descendant.Name] then
+				return descendant.Value
+			end
+		end
+	end
+	return nil
+end
+
+local function applyAmmoSettings(tool)
+	if not tool then
+		return
+	end
+
+	local maxAmmo = findMaxAmmo(tool)
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+			if infiniteAmmoEnabled and AMMO_VALUE_NAMES[descendant.Name] then
+				local targetValue = maxAmmo or descendant.Value
+				descendant.Value = targetValue
+			end
+
+			if fastReloadEnabled and RELOAD_VALUE_NAMES[descendant.Name] then
+				if ammoOriginals[descendant] == nil then
+					ammoOriginals[descendant] = descendant.Value
+				end
+				descendant.Value = math.max(0.05, descendant.Value * 0.2)
+			elseif not fastReloadEnabled and ammoOriginals[descendant] ~= nil then
+				descendant.Value = ammoOriginals[descendant]
+				ammoOriginals[descendant] = nil
+			end
+		end
+	end
+end
+
+local function updateAmmoForCharacter(character)
+	if not character then
+		return
+	end
+
+	for _, item in ipairs(character:GetChildren()) do
+		if item:IsA("Tool") then
+			applyAmmoSettings(item)
+		end
+	end
+
+	local backpack = player:FindFirstChild("Backpack")
+	if backpack then
+		for _, item in ipairs(backpack:GetChildren()) do
+			if item:IsA("Tool") then
+				applyAmmoSettings(item)
+			end
+		end
+	end
+end
+
+local function setAmmoHelpersEnabled()
+	if ammoConnection then
+		ammoConnection:Disconnect()
+		ammoConnection = nil
+	end
+
+	if not (infiniteAmmoEnabled or fastReloadEnabled) then
+		for value, original in pairs(ammoOriginals) do
+			if value and value.Parent then
+				value.Value = original
+			end
+			ammoOriginals[value] = nil
+		end
+		return
+	end
+
+	ammoConnection = RunService.RenderStepped:Connect(function()
+		local character = getCharacter()
+		if character then
+			updateAmmoForCharacter(character)
+		end
+	end)
+end
+
+local function applyHitbox(playerTarget)
+	local part = getAimPart(playerTarget)
+	if not part then
+		return
+	end
+
+	if hitboxEnabled then
+		if not hitboxOriginals[part] then
+			hitboxOriginals[part] = {
+				Size = part.Size,
+				Transparency = part.Transparency,
+			}
+		end
+		part.Size = part.Size * 1.6
+		part.Transparency = math.max(part.Transparency, 0.35)
+	else
+		local original = hitboxOriginals[part]
+		if original then
+			part.Size = original.Size
+			part.Transparency = original.Transparency
+			hitboxOriginals[part] = nil
+		end
+	end
+end
+
+local function setHitboxEnabled()
+	if hitboxConnection then
+		hitboxConnection:Disconnect()
+		hitboxConnection = nil
+	end
+
+	if not hitboxEnabled then
+		for part, original in pairs(hitboxOriginals) do
+			if part and part.Parent then
+				part.Size = original.Size
+				part.Transparency = original.Transparency
+			end
+			hitboxOriginals[part] = nil
+		end
+		return
+	end
+
+	hitboxConnection = RunService.RenderStepped:Connect(function()
+		for _, other in ipairs(getCandidatePlayers()) do
+			applyHitbox(other)
+		end
+	end)
+end
+
+local function ensureSilentAimHook()
+	if silentAimHooked then
+		return
+	end
+
+	if typeof(hookmetamethod) ~= "function" or typeof(getnamecallmethod) ~= "function" then
+		return
+	end
+
+	silentAimHooked = true
+	originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		local args = {...}
+
+		if silentAimEnabled and method == "Raycast" and self == workspace then
+			local origin = args[1]
+			local direction = args[2]
+			local rayParams = args[3]
+
+			if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
+				local target, _ = getNearestPlayer()
+				local part = target and getAimPart(target)
+				if part then
+					args[2] = part.Position - origin
+					if wallbangEnabled and rayParams and typeof(rayParams) == "Instance" and rayParams:IsA("RaycastParams") then
+						rayParams.FilterType = Enum.RaycastFilterType.Whitelist
+						rayParams.FilterDescendantsInstances = {part.Parent}
+					end
+					return originalNamecall(self, table.unpack(args))
+				end
+			end
+		end
+
+		return originalNamecall(self, ...)
+	end)
+end
+
 local screenGui = create("ScreenGui", {
 	Name = "FancyMenu",
 	ResetOnSpawn = false,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	IgnoreGuiInset = true,
 })
 
+screenGui.Parent = playerGui
+
 local accessKey = "MEMAYBEO-HUB-2024"
+local requireKey = true
 local animeImageId = "rbxassetid://11924456731"
 
 local keyGate = create("Frame", {
@@ -228,6 +739,23 @@ create("UICorner", {
 	Parent = closeButton,
 })
 
+local minimizeButton = create("TextButton", {
+	Name = "Minimize",
+	Size = UDim2.new(0, 28, 0, 28),
+	Position = UDim2.new(1, -70, 0.5, -14),
+	BackgroundColor3 = theme.panel,
+	Text = "–",
+	Font = Enum.Font.GothamBold,
+	TextColor3 = theme.muted,
+	TextSize = 18,
+	Parent = topBar,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 8),
+	Parent = minimizeButton,
+})
+
 local tabBar = create("Frame", {
 	Name = "TabBar",
 	Size = UDim2.new(0, 160, 1, -48),
@@ -263,6 +791,27 @@ local content = create("Frame", {
 	BackgroundTransparency = 1,
 	Parent = main,
 })
+
+local fullSize = main.Size
+local minimizedSize = UDim2.new(0, 520, 0, 48)
+
+local function applyMinimizeState()
+	if minimized then
+		main.Size = minimizedSize
+		tabBar.Visible = false
+		content.Visible = false
+		if hint then
+			hint.Visible = false
+		end
+	else
+		main.Size = fullSize
+		tabBar.Visible = true
+		content.Visible = true
+		if hint then
+			hint.Visible = true
+		end
+	end
+end
 
 local heroArt = create("ImageLabel", {
 	Name = "HeroArt",
@@ -531,14 +1080,15 @@ end)
 
 -- PVP section (UI only)
 local pvpSection = createSection(pvpPage, "PVP Toolkit")
-local pvpLayout = create("UIListLayout", {
-	Padding = UDim.new(0, 8),
-	FillDirection = Enum.FillDirection.Vertical,
+pvpSection.Size = UDim2.new(1, -24, 0, 220)
+local pvpLayout = create("UIGridLayout", {
+	CellSize = UDim2.new(0, 160, 0, 30),
+	CellPadding = UDim2.new(0, 6, 0, 6),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = pvpSection,
 })
 pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
 local pvpStatus = create("TextLabel", {
 	BackgroundTransparency = 1,
@@ -551,26 +1101,153 @@ local pvpStatus = create("TextLabel", {
 	Parent = pvpSection,
 })
 
-local pvpReady = false
-local pvpToggle = createButton(pvpSection, "Enable PVP Mode")
-pvpToggle.Size = UDim2.new(0, 180, 0, 34)
-pvpToggle.MouseButton1Click:Connect(function()
-	pvpReady = not pvpReady
-	if pvpReady then
-		pvpStatus.Text = "Status: Ready for PVP"
-		pvpToggle.Text = "Disable PVP Mode"
+local aimToggle = createButton(pvpSection, "Auto Aim: OFF")
+
+local locatorToggle = createButton(pvpSection, "Locator: OFF")
+
+local teamToggle = createButton(pvpSection, "Ignore Team: ON")
+
+local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
+
+local infiniteAmmoToggle = createButton(pvpSection, "Infinite Ammo: OFF")
+
+local fastReloadToggle = createButton(pvpSection, "Fast Reload: OFF")
+
+local silentAimToggle = createButton(pvpSection, "Head Magnet: OFF")
+
+local aimPartToggle = createButton(pvpSection, "Aim Part: Head")
+
+local hitboxToggle = createButton(pvpSection, "Hitbox: OFF")
+
+local pingButton = createButton(pvpSection, "Ping Nearest")
+
+aimToggle.MouseButton1Click:Connect(function()
+	autoAimEnabled = not autoAimEnabled
+	if autoAimEnabled then
+		aimToggle.Text = "Auto Aim: ON"
 	else
-		pvpStatus.Text = "Status: Idle"
-		pvpToggle.Text = "Enable PVP Mode"
+		aimToggle.Text = "Auto Aim: OFF"
+	end
+	setAutoAim(autoAimEnabled, pvpStatus)
+end)
+
+locatorToggle.MouseButton1Click:Connect(function()
+	locatorEnabled = not locatorEnabled
+	if locatorEnabled then
+		locatorToggle.Text = "Locator: ON"
+	else
+		locatorToggle.Text = "Locator: OFF"
+	end
+	setLocatorEnabled(locatorEnabled, pvpStatus)
+end)
+
+teamToggle.MouseButton1Click:Connect(function()
+	ignoreTeamEnabled = not ignoreTeamEnabled
+	if ignoreTeamEnabled then
+		teamToggle.Text = "Ignore Team: ON"
+	else
+		teamToggle.Text = "Ignore Team: OFF"
+	end
+end)
+
+wallbangToggle.MouseButton1Click:Connect(function()
+	wallbangEnabled = not wallbangEnabled
+	if wallbangEnabled then
+		wallbangToggle.Text = "Wallbang: ON"
+	else
+		wallbangToggle.Text = "Wallbang: OFF"
+	end
+	if autoAimEnabled then
+		setAutoAim(true, pvpStatus)
+	end
+end)
+
+infiniteAmmoToggle.MouseButton1Click:Connect(function()
+	infiniteAmmoEnabled = not infiniteAmmoEnabled
+	if infiniteAmmoEnabled then
+		infiniteAmmoToggle.Text = "Infinite Ammo: ON"
+	else
+		infiniteAmmoToggle.Text = "Infinite Ammo: OFF"
+	end
+	setAmmoHelpersEnabled()
+end)
+
+fastReloadToggle.MouseButton1Click:Connect(function()
+	fastReloadEnabled = not fastReloadEnabled
+	if fastReloadEnabled then
+		fastReloadToggle.Text = "Fast Reload: ON"
+	else
+		fastReloadToggle.Text = "Fast Reload: OFF"
+	end
+	setAmmoHelpersEnabled()
+end)
+
+silentAimToggle.MouseButton1Click:Connect(function()
+	silentAimEnabled = not silentAimEnabled
+	if silentAimEnabled then
+		silentAimToggle.Text = "Head Magnet: ON"
+		ensureSilentAimHook()
+		pvpStatus.Text = "Status: Head Magnet enabled"
+	else
+		silentAimToggle.Text = "Head Magnet: OFF"
+		pvpStatus.Text = "Status: Head Magnet disabled"
+	end
+end)
+
+aimPartToggle.MouseButton1Click:Connect(function()
+	aimPartIndex = aimPartIndex + 1
+	if aimPartIndex > #aimParts then
+		aimPartIndex = 1
+	end
+	aimPartToggle.Text = "Aim Part: " .. (aimParts[aimPartIndex] or "Head")
+end)
+
+hitboxToggle.MouseButton1Click:Connect(function()
+	hitboxEnabled = not hitboxEnabled
+	if hitboxEnabled then
+		hitboxToggle.Text = "Hitbox: ON"
+	else
+		hitboxToggle.Text = "Hitbox: OFF"
+	end
+	setHitboxEnabled()
+end)
+
+pingButton.MouseButton1Click:Connect(function()
+	local target, distanceOrError = getNearestPlayer()
+	if not target then
+		pvpStatus.Text = distanceOrError or "Status: Không thể định vị."
+		return
+	end
+
+	local head = getHeadPart(target)
+	if not head then
+		pvpStatus.Text = "Status: Không thể xác định vị trí."
+		return
+	end
+
+	pvpStatus.Text = string.format("Status: Nearest %s (%.0fm)", target.Name, distanceOrError)
+	if setclipboard then
+		setclipboard(string.format("CFrame.new(%.2f, %.2f, %.2f)", head.Position.X, head.Position.Y, head.Position.Z))
 	end
 end)
 
 local function setVisible(state)
+	if state then
+		main.Position = UDim2.new(0.5, -260, 0.5, -170)
+	end
 	main.Visible = state
+	if state then
+		applyMinimizeState()
+	end
 end
 
 closeButton.MouseButton1Click:Connect(function()
 	setVisible(false)
+end)
+
+minimizeButton.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	applyMinimizeState()
 end)
 
 keyButton.MouseButton1Click:Connect(function()
@@ -585,6 +1262,11 @@ keyButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+if not requireKey then
+	keyGate.Visible = false
+	setVisible(true)
+end
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
@@ -596,7 +1278,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-screenGui.Parent = playerGui
+player.CharacterAdded:Connect(function()
+	if infiniteAmmoEnabled or fastReloadEnabled then
+		setAmmoHelpersEnabled()
+	end
+end)
 
 local drag = false
 local dragStart
@@ -607,21 +1293,25 @@ local function updateDrag(input)
 	main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-topBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		drag = true
-		dragStart = input.Position
-		startPos = main.Position
-
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				drag = false
-			end
-		end)
+local function beginDrag(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+		return
 	end
-end)
+	drag = true
+	dragStart = input.Position
+	startPos = main.Position
 
-topBar.InputChanged:Connect(function(input)
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			drag = false
+		end
+	end)
+end
+
+topBar.InputBegan:Connect(beginDrag)
+main.InputBegan:Connect(beginDrag)
+
+UserInputService.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement then
 		if drag then
 			updateDrag(input)
@@ -640,6 +1330,8 @@ local hint = create("TextLabel", {
 	TextXAlignment = Enum.TextXAlignment.Center,
 	Parent = main,
 })
+
+applyMinimizeState()
 
 create("UIGradient", {
 	Color = ColorSequence.new({
