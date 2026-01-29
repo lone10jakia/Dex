@@ -1080,9 +1080,10 @@ end)
 
 -- PVP section (UI only)
 local pvpSection = createSection(pvpPage, "PVP Toolkit")
+pvpSection.Size = UDim2.new(1, -24, 0, 220)
 local pvpLayout = create("UIGridLayout", {
-	CellSize = UDim2.new(0, 170, 0, 32),
-	CellPadding = UDim2.new(0, 8, 0, 8),
+	CellSize = UDim2.new(0, 160, 0, 30),
+	CellPadding = UDim2.new(0, 6, 0, 6),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = pvpSection,
 })
