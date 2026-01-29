@@ -1080,14 +1080,14 @@ end)
 
 -- PVP section (UI only)
 local pvpSection = createSection(pvpPage, "PVP Toolkit")
-local pvpLayout = create("UIListLayout", {
-	Padding = UDim.new(0, 8),
-	FillDirection = Enum.FillDirection.Vertical,
+local pvpLayout = create("UIGridLayout", {
+	CellSize = UDim2.new(0, 170, 0, 32),
+	CellPadding = UDim2.new(0, 8, 0, 8),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = pvpSection,
 })
 pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
 local pvpStatus = create("TextLabel", {
 	BackgroundTransparency = 1,
@@ -1101,34 +1101,24 @@ local pvpStatus = create("TextLabel", {
 })
 
 local aimToggle = createButton(pvpSection, "Auto Aim: OFF")
-aimToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local locatorToggle = createButton(pvpSection, "Locator: OFF")
-locatorToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local teamToggle = createButton(pvpSection, "Ignore Team: ON")
-teamToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
-wallbangToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local infiniteAmmoToggle = createButton(pvpSection, "Infinite Ammo: OFF")
-infiniteAmmoToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local fastReloadToggle = createButton(pvpSection, "Fast Reload: OFF")
-fastReloadToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local silentAimToggle = createButton(pvpSection, "Head Magnet: OFF")
-silentAimToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local aimPartToggle = createButton(pvpSection, "Aim Part: Head")
-aimPartToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local hitboxToggle = createButton(pvpSection, "Hitbox: OFF")
-hitboxToggle.Size = UDim2.new(0, 180, 0, 34)
 
 local pingButton = createButton(pvpSection, "Ping Nearest")
-pingButton.Size = UDim2.new(0, 180, 0, 34)
 
 aimToggle.MouseButton1Click:Connect(function()
 	autoAimEnabled = not autoAimEnabled
