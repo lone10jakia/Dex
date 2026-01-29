@@ -31,6 +31,8 @@ local locatorEnabled = false
 local locatorConnection
 local locatorBillboards = {}
 local ignoreTeamEnabled = true
+ codex/add-aim-head-menu-and-localization-g6nxpx
+local wallbangEnabled = true
 
 local function create(className, props)
 	local inst = Instance.new(className)
@@ -44,9 +46,25 @@ local function tween(obj, props, time)
 	TweenService:Create(obj, TweenInfo.new(time or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
+local function getCharacter()
+	return player.Character
+end
+
 local function getRoot()
-	local character = player.Character or player.CharacterAdded:Wait()
+	local character = getCharacter()
+	if not character then
+		return nil
+	end
 	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function isCharacterAlive()
+	local character = getCharacter()
+	if not character then
+		return false
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	return humanoid and humanoid.Health > 0
 end
 
 local function getHeadPart(targetPlayer)
@@ -235,6 +253,13 @@ local function setAutoAim(enabled, statusLabel)
 			return
 		end
 
+		if not isCharacterAlive() then
+			if statusLabel then
+				statusLabel.Text = "Status: Waiting for respawn"
+			end
+			return
+		end
+
 		local root = getRoot()
 		if not root then
 			return
@@ -251,6 +276,26 @@ local function setAutoAim(enabled, statusLabel)
 		local head = getHeadPart(target)
 		if not head then
 			return
+		end
+
+		if not wallbangEnabled and workspace and workspace.Raycast then
+			local origin = camera.CFrame.Position
+			local direction = head.Position - origin
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+			local character = getCharacter()
+			if character then
+				rayParams.FilterDescendantsInstances = {character}
+			else
+				rayParams.FilterDescendantsInstances = {}
+			end
+			local result = workspace:Raycast(origin, direction, rayParams)
+			if result and result.Instance and not result.Instance:IsDescendantOf(head.Parent) then
+				if statusLabel then
+					statusLabel.Text = "Status: Target blocked"
+				end
+				return
+			end
 		end
 
 		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, head.Position)
@@ -785,6 +830,10 @@ locatorToggle.Size = UDim2.new(0, 180, 0, 34)
 local teamToggle = createButton(pvpSection, "Ignore Team: ON")
 teamToggle.Size = UDim2.new(0, 180, 0, 34)
 
+codex/add-aim-head-menu-and-localization-g6nxpx
+local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
+wallbangToggle.Size = UDim2.new(0, 180, 0, 34)
+
 local pingButton = createButton(pvpSection, "Ping Nearest")
 pingButton.Size = UDim2.new(0, 180, 0, 34)
 
@@ -814,6 +863,18 @@ teamToggle.MouseButton1Click:Connect(function()
 		teamToggle.Text = "Ignore Team: ON"
 	else
 		teamToggle.Text = "Ignore Team: OFF"
+	end
+end)
+
+wallbangToggle.MouseButton1Click:Connect(function()
+	wallbangEnabled = not wallbangEnabled
+	if wallbangEnabled then
+		wallbangToggle.Text = "Wallbang: ON"
+	else
+		wallbangToggle.Text = "Wallbang: OFF"
+	end
+	if autoAimEnabled then
+		setAutoAim(true, pvpStatus)
 	end
 end)
 
@@ -883,21 +944,25 @@ local function updateDrag(input)
 	main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-topBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		drag = true
-		dragStart = input.Position
-		startPos = main.Position
-
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				drag = false
-			end
-		end)
+local function beginDrag(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+		return
 	end
-end)
+	drag = true
+	dragStart = input.Position
+	startPos = main.Position
 
-topBar.InputChanged:Connect(function(input)
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			drag = false
+		end
+	end)
+end
+
+topBar.InputBegan:Connect(beginDrag)
+main.InputBegan:Connect(beginDrag)
+
+UserInputService.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement then
 		if drag then
 			updateDrag(input)
