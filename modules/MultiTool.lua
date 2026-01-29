@@ -45,6 +45,9 @@ local function main()
 	local autoAimConnection
 	local autoAimEnabled = false
 	local ignoreTeamEnabled = true
+	local locatorEnabled = false
+	local locatorConnection
+	local locatorBillboards = {}
 	local headAimModule
 	local headAimLoaded = false
 	local headAimError
@@ -110,6 +113,159 @@ local function main()
 			end
 		end
 		return enemies
+	end
+
+	local function getHeadPart(target)
+		if not target then
+			return nil
+		end
+
+		local character = target.Character
+		if not character then
+			return nil
+		end
+
+		local head = character:FindFirstChild("Head")
+		if head and head:IsA("BasePart") then
+			return head
+		end
+
+		local primary = character.PrimaryPart
+		if primary and primary:IsA("BasePart") then
+			return primary
+		end
+
+		return nil
+	end
+
+	local function getNearestPlayer()
+		local root = getRoot()
+		if not root then
+			return nil, "Không tìm thấy HumanoidRootPart."
+		end
+
+		local nearest
+		local nearestDistance
+		for _, player in ipairs(service.Players:GetPlayers()) do
+			if player ~= plr and (not ignoreTeamEnabled or player.Team ~= plr.Team) then
+				local head = getHeadPart(player)
+				if head then
+					local distance = (head.Position - root.Position).Magnitude
+					if not nearestDistance or distance < nearestDistance then
+						nearest = player
+						nearestDistance = distance
+					end
+				end
+			end
+		end
+
+		if not nearest then
+			return nil, "Không tìm thấy người chơi phù hợp."
+		end
+
+		return nearest, nearestDistance
+	end
+
+	local function createLocatorBillboard(player, head)
+		local billboard = Instance.new("BillboardGui")
+		billboard.Name = "DexLocator"
+		billboard.Size = UDim2.new(0,160,0,36)
+		billboard.StudsOffset = Vector3.new(0,2.6,0)
+		billboard.AlwaysOnTop = true
+		billboard.Parent = head
+
+		local frame = Instance.new("Frame")
+		frame.BackgroundColor3 = Settings.Theme.Main2
+		frame.BackgroundTransparency = 0.15
+		frame.BorderSizePixel = 0
+		frame.Size = UDim2.new(1,0,1,0)
+		frame.Parent = billboard
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0,6)
+		corner.Parent = frame
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Settings.Theme.Outline2
+		stroke.Transparency = 0.3
+		stroke.Parent = frame
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Name = "NameLabel"
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Size = UDim2.new(1,-8,1,0)
+		nameLabel.Position = UDim2.new(0,4,0,0)
+		nameLabel.Font = Enum.Font.GothamBold
+		nameLabel.TextColor3 = Settings.Theme.Text
+		nameLabel.TextSize = 12
+		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+		nameLabel.Parent = frame
+
+		locatorBillboards[player] = billboard
+	end
+
+	local function clearLocatorBillboards()
+		for player, billboard in pairs(locatorBillboards) do
+			if billboard then
+				billboard:Destroy()
+			end
+			locatorBillboards[player] = nil
+		end
+	end
+
+	local function setLocatorEnabled(enabled)
+		locatorEnabled = enabled
+		if locatorConnection then
+			locatorConnection:Disconnect()
+			locatorConnection = nil
+		end
+		clearLocatorBillboards()
+
+		if not enabled then
+			setStatus("Đã tắt định vị người chơi.",Settings.Theme.PlaceholderText)
+			return
+		end
+
+		setStatus("Đang định vị người chơi...",Color3.fromRGB(129,214,152))
+		locatorConnection = service.RunService.RenderStepped:Connect(function()
+			local root = getRoot()
+			if not root then
+				return
+			end
+
+			local validPlayers = {}
+			for _, player in ipairs(service.Players:GetPlayers()) do
+				if player ~= plr and (not ignoreTeamEnabled or player.Team ~= plr.Team) then
+					table.insert(validPlayers, player)
+				end
+			end
+
+			for _, player in ipairs(validPlayers) do
+				local head = getHeadPart(player)
+				if head then
+					if not locatorBillboards[player] or not locatorBillboards[player].Parent then
+						createLocatorBillboard(player, head)
+					end
+					local billboard = locatorBillboards[player]
+					if billboard and billboard:FindFirstChild("Frame") then
+						local label = billboard.Frame:FindFirstChild("NameLabel")
+						if label then
+							local distance = (head.Position - root.Position).Magnitude
+							label.Text = string.format("%s • %.0fm", player.Name, distance)
+						end
+					end
+				end
+			end
+
+			for player, billboard in pairs(locatorBillboards) do
+				if not table.find(validPlayers, player) then
+					if billboard then
+						billboard:Destroy()
+					end
+					locatorBillboards[player] = nil
+				end
+			end
+		end)
 	end
 
 	local function setAutoAim(enabled)
@@ -540,6 +696,51 @@ local function main()
 				teamToggle.Text = "Ignore Team: ON"
 			else
 				teamToggle.Text = "Ignore Team: OFF"
+			end
+		end)
+
+		local locateSection, locateBody = createSection(scroll,"Locate Players","Định vị & ghim vị trí người chơi","grid")
+		locateSection.LayoutOrder = 6
+		locateSection.Size = UDim2.new(1,0,0,120)
+
+		local locatorToggle = Instance.new("TextButton")
+		locatorToggle.Text = "Locator: OFF"
+		locatorToggle.Size = UDim2.new(0.5,-4,0,36)
+		locatorToggle.Parent = locateBody
+		styleButton(locatorToggle)
+
+		local pingButton = Instance.new("TextButton")
+		pingButton.Text = "Ping Nearest"
+		pingButton.Size = UDim2.new(0.5,-4,0,36)
+		pingButton.Parent = locateBody
+		styleButton(pingButton)
+
+		locatorToggle.MouseButton1Click:Connect(function()
+			locatorEnabled = not locatorEnabled
+			if locatorEnabled then
+				locatorToggle.Text = "Locator: ON"
+			else
+				locatorToggle.Text = "Locator: OFF"
+			end
+			setLocatorEnabled(locatorEnabled)
+		end)
+
+		pingButton.MouseButton1Click:Connect(function()
+			local target, distanceOrError = getNearestPlayer()
+			if not target then
+				setStatus(distanceOrError or "Không thể định vị.",Settings.Theme.Important)
+				return
+			end
+
+			local head = getHeadPart(target)
+			if not head then
+				setStatus("Không thể xác định vị trí mục tiêu.",Settings.Theme.Important)
+				return
+			end
+
+			setStatus(string.format("Mục tiêu gần nhất: %s (%.0fm).", target.Name, distanceOrError),Color3.fromRGB(129,214,152))
+			if env.setclipboard then
+				env.setclipboard("CFrame.new("..formatVector(head.Position)..")")
 			end
 		end)
 
