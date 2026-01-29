@@ -37,6 +37,9 @@ local fastReloadEnabled = false
 local ammoConnection
 local ammoOriginals = {}
 local minimized = false
+local silentAimEnabled = false
+local silentAimHooked = false
+local originalNamecall
 
 local function create(className, props)
 	local inst = Instance.new(className)
@@ -111,8 +114,10 @@ end
 
 local function getNearestPlayer()
 	local root = getRoot()
-	if not root then
-		return nil, "Không tìm thấy HumanoidRootPart."
+	local origin = root and root.Position
+	if not origin then
+		local camera = workspace.CurrentCamera
+		origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
 	end
 
 	local nearest
@@ -120,7 +125,7 @@ local function getNearestPlayer()
 	for _, other in ipairs(getCandidatePlayers()) do
 		local head = getHeadPart(other)
 		if head then
-			local distance = (head.Position - root.Position).Magnitude
+			local distance = (head.Position - origin).Magnitude
 			if not nearestDistance or distance < nearestDistance then
 				nearest = other
 				nearestDistance = distance
@@ -206,9 +211,13 @@ local function setLocatorEnabled(enabled, statusLabel)
 		statusLabel.Text = "Status: Locating players..."
 	end
 	locatorConnection = RunService.RenderStepped:Connect(function()
+		local origin
 		local root = getRoot()
-		if not root then
-			return
+		if root then
+			origin = root.Position
+		else
+			local camera = workspace.CurrentCamera
+			origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
 		end
 
 		local candidates = getCandidatePlayers()
@@ -221,7 +230,7 @@ local function setLocatorEnabled(enabled, statusLabel)
 				local billboard = locatorBillboards[other]
 				local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
 				if label then
-					local distance = (head.Position - root.Position).Magnitude
+					local distance = (head.Position - origin).Magnitude
 					label.Text = string.format("%s • %.0fm", other.Name, distance)
 				end
 			end
@@ -416,6 +425,43 @@ local function setAmmoHelpersEnabled()
 		if character then
 			updateAmmoForCharacter(character)
 		end
+	end)
+end
+
+local function ensureSilentAimHook()
+	if silentAimHooked then
+		return
+	end
+
+	if typeof(hookmetamethod) ~= "function" or typeof(getnamecallmethod) ~= "function" then
+		return
+	end
+
+	silentAimHooked = true
+	originalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		local args = {...}
+
+		if silentAimEnabled and method == "Raycast" and self == workspace then
+			local origin = args[1]
+			local direction = args[2]
+			local rayParams = args[3]
+
+			if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
+				local target, _ = getNearestPlayer()
+				local head = target and getHeadPart(target)
+				if head then
+					args[2] = head.Position - origin
+					if wallbangEnabled and rayParams and typeof(rayParams) == "Instance" and rayParams:IsA("RaycastParams") then
+						rayParams.FilterType = Enum.RaycastFilterType.Whitelist
+						rayParams.FilterDescendantsInstances = {head.Parent}
+					end
+					return originalNamecall(self, table.unpack(args))
+				end
+			end
+		end
+
+		return originalNamecall(self, ...)
 	end)
 end
 
@@ -994,6 +1040,9 @@ infiniteAmmoToggle.Size = UDim2.new(0, 180, 0, 34)
 local fastReloadToggle = createButton(pvpSection, "Fast Reload: OFF")
 fastReloadToggle.Size = UDim2.new(0, 180, 0, 34)
 
+local silentAimToggle = createButton(pvpSection, "Head Magnet: OFF")
+silentAimToggle.Size = UDim2.new(0, 180, 0, 34)
+
 local pingButton = createButton(pvpSection, "Ping Nearest")
 pingButton.Size = UDim2.new(0, 180, 0, 34)
 
@@ -1056,6 +1105,18 @@ fastReloadToggle.MouseButton1Click:Connect(function()
 		fastReloadToggle.Text = "Fast Reload: OFF"
 	end
 	setAmmoHelpersEnabled()
+end)
+
+silentAimToggle.MouseButton1Click:Connect(function()
+	silentAimEnabled = not silentAimEnabled
+	if silentAimEnabled then
+		silentAimToggle.Text = "Head Magnet: ON"
+		ensureSilentAimHook()
+		pvpStatus.Text = "Status: Head Magnet enabled"
+	else
+		silentAimToggle.Text = "Head Magnet: OFF"
+		pvpStatus.Text = "Status: Head Magnet disabled"
+	end
 end)
 
 pingButton.MouseButton1Click:Connect(function()
@@ -1139,7 +1200,7 @@ local function updateDrag(input)
 	main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-	local function beginDrag(input)
+local function beginDrag(input)
 	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 		return
 	end
