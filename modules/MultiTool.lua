@@ -42,6 +42,15 @@ local function main()
 
 	local lightingSnapshot = {}
 	local statsConnection
+	local autoAimConnection
+	local autoAimEnabled = false
+	local ignoreTeamEnabled = true
+	local locateEnabled = false
+	local locateConnection
+	local locateHighlights = {}
+	local headAimModule
+	local headAimLoaded = false
+	local headAimError
 
 	local function setStatus(text,color)
 		statusLabel.Text = text
@@ -64,6 +73,161 @@ local function main()
 
 	local function formatVector(vec)
 		return string.format("%.2f, %.2f, %.2f", vec.X, vec.Y, vec.Z)
+	end
+
+	local function loadHeadAim()
+		if headAimLoaded then
+			return headAimModule, headAimError
+		end
+
+		headAimLoaded = true
+
+		if not env or not env.loadfile then
+			headAimError = "Executor không hỗ trợ loadfile."
+			return nil, headAimError
+		end
+
+		local ok, chunk = pcall(env.loadfile, "head_aim.lua")
+		if not ok or type(chunk) ~= "function" then
+			headAimError = "Không thể tải head_aim.lua."
+			return nil, headAimError
+		end
+
+		local okModule, moduleData = pcall(chunk)
+		if not okModule or type(moduleData) ~= "table" then
+			headAimError = "Module head_aim.lua không hợp lệ."
+			return nil, headAimError
+		end
+
+		headAimModule = moduleData
+		return headAimModule, nil
+	end
+
+	local function getEnemyTargets()
+		local enemies = {}
+		for _, player in ipairs(service.Players:GetPlayers()) do
+			if player ~= plr then
+				if not ignoreTeamEnabled or player.Team ~= plr.Team then
+					table.insert(enemies, player)
+				end
+			end
+		end
+		return enemies
+	end
+
+	local function clearLocateHighlights()
+		for _, highlight in pairs(locateHighlights) do
+			if highlight and highlight.Parent then
+				highlight:Destroy()
+			end
+		end
+		locateHighlights = {}
+	end
+
+	local function updateLocateHighlights()
+		for _, player in ipairs(service.Players:GetPlayers()) do
+			if player ~= plr then
+				if ignoreTeamEnabled and player.Team == plr.Team then
+					if locateHighlights[player] then
+						locateHighlights[player]:Destroy()
+						locateHighlights[player] = nil
+					end
+				else
+					local character = player.Character
+					if character then
+						local highlight = locateHighlights[player]
+						if not highlight or highlight.Parent ~= character then
+							if highlight then
+								highlight:Destroy()
+							end
+							highlight = Instance.new("Highlight")
+							highlight.FillColor = Color3.fromRGB(255,112,112)
+							highlight.OutlineColor = Color3.fromRGB(255,255,255)
+							highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+							highlight.Parent = character
+							locateHighlights[player] = highlight
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local function setLocateEnemies(enabled)
+		locateEnabled = enabled
+		if locateConnection then
+			locateConnection:Disconnect()
+			locateConnection = nil
+		end
+
+		if not enabled then
+			clearLocateHighlights()
+			setStatus("Đã tắt định vị người chơi.",Settings.Theme.PlaceholderText)
+			return
+		end
+
+		setStatus("Đang định vị người chơi.",Color3.fromRGB(129,214,152))
+		locateConnection = service.RunService.RenderStepped:Connect(function()
+			if not locateEnabled then
+				return
+			end
+			updateLocateHighlights()
+		end)
+	end
+
+	local function setAutoAim(enabled)
+		autoAimEnabled = enabled
+		if autoAimConnection then
+			autoAimConnection:Disconnect()
+			autoAimConnection = nil
+		end
+
+		if not enabled then
+			setStatus("Đã tắt auto aim.",Settings.Theme.PlaceholderText)
+			return
+		end
+
+		local moduleData, loadError = loadHeadAim()
+		if not moduleData then
+			setStatus(loadError or "Không thể bật auto aim.",Settings.Theme.Important)
+			autoAimEnabled = false
+			return
+		end
+
+		setStatus("Auto aim đang chạy.",Color3.fromRGB(129,214,152))
+		autoAimConnection = service.RunService.RenderStepped:Connect(function()
+			local camera = workspace.CurrentCamera
+			if not camera or not autoAimEnabled then
+				return
+			end
+
+			local origin = camera.CFrame.Position
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+			local character = plr.Character
+			if character then
+				rayParams.FilterDescendantsInstances = {character}
+			else
+				rayParams.FilterDescendantsInstances = {}
+			end
+
+			local enemies = getEnemyTargets()
+			local head, position, obstructed = moduleData.getEnemyLocation(enemies, origin, {
+				PreferClosest = true,
+				RaycastParams = rayParams,
+			})
+
+			if head and position then
+				camera.CFrame = CFrame.lookAt(origin, position)
+				if obstructed then
+					setStatus("Đang khóa mục tiêu sau vật cản.",Color3.fromRGB(255,176,81))
+				else
+					setStatus("Đang khóa mục tiêu.",Color3.fromRGB(129,214,152))
+				end
+			else
+				setStatus("Không tìm thấy mục tiêu.",Settings.Theme.PlaceholderText)
+			end
+		end)
 	end
 
 	local function snapshotLighting()
@@ -405,6 +569,57 @@ local function main()
 		restoreButton.MouseButton1Click:Connect(function()
 			applyLightingSnapshot()
 			setStatus("Đã khôi phục lighting ban đầu.",Color3.fromRGB(129,214,152))
+		end)
+
+		local combatSection, combatBody = createSection(scroll,"Combat Assist","Hỗ trợ khóa mục tiêu qua vật cản","grid")
+		combatSection.LayoutOrder = 5
+		combatSection.Size = UDim2.new(1,0,0,120)
+
+		local aimToggle = Instance.new("TextButton")
+		aimToggle.Text = "Auto Aim: OFF"
+		aimToggle.Size = UDim2.new(0.5,-4,0,36)
+		aimToggle.Parent = combatBody
+		styleButton(aimToggle)
+
+		local teamToggle = Instance.new("TextButton")
+		teamToggle.Text = "Ignore Team: ON"
+		teamToggle.Size = UDim2.new(0.5,-4,0,36)
+		teamToggle.Parent = combatBody
+		styleButton(teamToggle)
+
+		local locateToggle = Instance.new("TextButton")
+		locateToggle.Text = "Locate Enemies: OFF"
+		locateToggle.Size = UDim2.new(0.5,-4,0,36)
+		locateToggle.Parent = combatBody
+		styleButton(locateToggle)
+
+		aimToggle.MouseButton1Click:Connect(function()
+			autoAimEnabled = not autoAimEnabled
+			if autoAimEnabled then
+				aimToggle.Text = "Auto Aim: ON"
+			else
+				aimToggle.Text = "Auto Aim: OFF"
+			end
+			setAutoAim(autoAimEnabled)
+		end)
+
+		teamToggle.MouseButton1Click:Connect(function()
+			ignoreTeamEnabled = not ignoreTeamEnabled
+			if ignoreTeamEnabled then
+				teamToggle.Text = "Ignore Team: ON"
+			else
+				teamToggle.Text = "Ignore Team: OFF"
+			end
+		end)
+
+		locateToggle.MouseButton1Click:Connect(function()
+			locateEnabled = not locateEnabled
+			if locateEnabled then
+				locateToggle.Text = "Locate Enemies: ON"
+			else
+				locateToggle.Text = "Locate Enemies: OFF"
+			end
+			setLocateEnemies(locateEnabled)
 		end)
 
 		snapshotLighting()
