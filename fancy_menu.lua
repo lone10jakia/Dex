@@ -31,6 +31,7 @@ local locatorEnabled = false
 local locatorConnection
 local locatorBillboards = {}
 local ignoreTeamEnabled = true
+ codex/add-aim-head-menu-and-localization-g6nxpx
 local wallbangEnabled = true
 
 local function create(className, props)
@@ -829,6 +830,7 @@ locatorToggle.Size = UDim2.new(0, 180, 0, 34)
 local teamToggle = createButton(pvpSection, "Ignore Team: ON")
 teamToggle.Size = UDim2.new(0, 180, 0, 34)
 
+codex/add-aim-head-menu-and-localization-g6nxpx
 local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
 wallbangToggle.Size = UDim2.new(0, 180, 0, 34)
 
