@@ -59,7 +59,7 @@ ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 130, 0, 385)
+MainFrame.Size = UDim2.new(0, 130, 0, 415)
 MainFrame.Position = UDim2.new(1, 150, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Visible = false
@@ -96,14 +96,15 @@ local SpinButton = makeButton(25, "🔄 Xoay:")
 local SpeedButton = makeButton(60, "👟 Tăng tốc:")
 local HealthButton = makeButton(95, "❤️ Thanh máu:")
 local StunButton = makeButton(130, "🥴 Choáng:")
-local AutoAttackButton = makeButton(165, "⚔️ Auto Đánh:")
-local FixLagButton = makeButton(200, "⚡ FixLag:")
-local RespawnButton = makeButton(235, "♻️ Hồi sinh:")
-local AutoBangButton = makeButton(270, "🤕 Auto Băng:")
+local AntiKnockButton = makeButton(165, "🛡️ Chống văng:")
+local AutoAttackButton = makeButton(200, "⚔️ Auto Đánh:")
+local FixLagButton = makeButton(235, "⚡ FixLag:")
+local RespawnButton = makeButton(270, "♻️ Hồi sinh:")
+local AutoBangButton = makeButton(305, "🤕 Auto Băng:")
 
 local WeaponLabel = Instance.new("TextLabel")
 WeaponLabel.Size = UDim2.new(0, 110, 0, 16)
-WeaponLabel.Position = UDim2.new(0, 10, 0, 305)
+WeaponLabel.Position = UDim2.new(0, 10, 0, 340)
 WeaponLabel.BackgroundTransparency = 1
 WeaponLabel.Text = "🎯 Vũ khí:"
 WeaponLabel.TextSize = 12
@@ -114,7 +115,7 @@ WeaponLabel.Parent = MainFrame
 
 local WeaponInput = Instance.new("TextBox")
 WeaponInput.Size = UDim2.new(0, 110, 0, 24)
-WeaponInput.Position = UDim2.new(0, 10, 0, 323)
+WeaponInput.Position = UDim2.new(0, 10, 0, 358)
 WeaponInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 WeaponInput.Text = ""
 WeaponInput.PlaceholderText = "Tên vũ khí"
@@ -127,7 +128,7 @@ Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 
 local WeaponSuggestion = Instance.new("TextLabel")
 WeaponSuggestion.Size = UDim2.new(0, 110, 0, 14)
-WeaponSuggestion.Position = UDim2.new(0, 10, 0, 350)
+WeaponSuggestion.Position = UDim2.new(0, 10, 0, 385)
 WeaponSuggestion.BackgroundTransparency = 1
 WeaponSuggestion.Text = ""
 WeaponSuggestion.TextSize = 10
@@ -142,6 +143,7 @@ local speedBoost = persisted.speedBoost or false
 local healthVisible = persisted.healthVisible or false
 local stunActive = persisted.stunActive or false
 local stunBusy = false
+local antiKnockback = persisted.antiKnockback or false
 local fastRespawn = persisted.fastRespawn or false
 local autoAttack = persisted.autoAttack or false
 local fixLag = persisted.fixLag or false
@@ -156,7 +158,6 @@ end
 local spinSpeed = 2500
 local normalSpeed, boostedSpeed = 16, 32
 local stunDuration = 0.6
-local stunSpeed = 8
 
 local function persistState()
 	saveSettings({
@@ -164,6 +165,7 @@ local function persistState()
 		speedBoost = speedBoost,
 		healthVisible = healthVisible,
 		stunActive = stunActive,
+		antiKnockback = antiKnockback,
 		fastRespawn = fastRespawn,
 		autoAttack = autoAttack,
 		fixLag = fixLag,
@@ -244,9 +246,6 @@ end)
 local function applySpeed()
 	local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
 	if hum then
-		if stunActive and stunBusy then
-			return
-		end
 		hum.WalkSpeed = speedBoost and boostedSpeed or normalSpeed
 	end
 end
@@ -367,13 +366,9 @@ Players.PlayerAdded:Connect(function(plr)
 end)
 
 ------------------------------------------------------------------------
--- STUN
+-- DAMAGE EFFECTS
 ------------------------------------------------------------------------
-local stunConnection = nil
-
-local function desiredSpeed()
-	return speedBoost and boostedSpeed or normalSpeed
-end
+local damageConnection = nil
 
 local function showStunEffect(char)
 	if not char then
@@ -406,39 +401,47 @@ local function applyStun(hum)
 		return
 	end
 	stunBusy = true
-	local original = desiredSpeed()
-	local originalJump = hum.JumpPower
-	hum.WalkSpeed = math.max(stunSpeed, original * 0.5)
-	hum.JumpPower = math.max(25, originalJump * 0.6)
 	showStunEffect(hum.Parent)
 	task.delay(stunDuration, function()
-		if hum and hum.Parent then
-			hum.WalkSpeed = desiredSpeed()
-			hum.JumpPower = originalJump
-		end
 		stunBusy = false
 	end)
 end
 
-local function setupStun(char)
+local function applyAntiKnockback(char)
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		return
+	end
+
+	local currentVel = hrp.AssemblyLinearVelocity
+	hrp.AssemblyLinearVelocity = Vector3.new(0, currentVel.Y, 0)
+	hrp.AssemblyAngularVelocity = Vector3.zero
+end
+
+local function setupDamageEffects(char)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not hum then
 		return
 	end
 
 	local lastHealth = hum.Health
-	if stunConnection then
-		stunConnection:Disconnect()
+	if damageConnection then
+		damageConnection:Disconnect()
 	end
 
-	stunConnection = hum.HealthChanged:Connect(function(current)
-		if not stunActive then
+	damageConnection = hum.HealthChanged:Connect(function(current)
+		if not stunActive and not antiKnockback then
 			lastHealth = current
 			return
 		end
 
 		if current < lastHealth then
-			applyStun(hum)
+			if stunActive then
+				applyStun(hum)
+			end
+			if antiKnockback then
+				applyAntiKnockback(char)
+			end
 		end
 		lastHealth = current
 	end)
@@ -447,15 +450,28 @@ end
 StunButton.MouseButton1Click:Connect(function()
 	stunActive = not stunActive
 	setToggleText(StunButton, "🥴 Choáng:", stunActive)
-	if stunActive and LocalPlayer.Character then
-		setupStun(LocalPlayer.Character)
-	else
-		if stunConnection then
-			stunConnection:Disconnect()
-			stunConnection = nil
-		end
+	if LocalPlayer.Character then
+		setupDamageEffects(LocalPlayer.Character)
+	end
+	if not stunActive then
 		stunBusy = false
-		applySpeed()
+	end
+	if not stunActive and not antiKnockback and damageConnection then
+		damageConnection:Disconnect()
+		damageConnection = nil
+	end
+	persistState()
+end)
+
+AntiKnockButton.MouseButton1Click:Connect(function()
+	antiKnockback = not antiKnockback
+	setToggleText(AntiKnockButton, "🛡️ Chống văng:", antiKnockback)
+	if LocalPlayer.Character then
+		setupDamageEffects(LocalPlayer.Character)
+	end
+	if not stunActive and not antiKnockback and damageConnection then
+		damageConnection:Disconnect()
+		damageConnection = nil
 	end
 	persistState()
 end)
@@ -639,8 +655,8 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 		syncPreferredWeaponFromTool(child)
 	end)
 
-	if stunActive then
-		setupStun(char)
+	if stunActive or antiKnockback then
+		setupDamageEffects(char)
 	end
 
 	if fastRespawn then
@@ -680,6 +696,7 @@ local function applyInitialState()
 	setToggleText(SpeedButton, "👟 Tăng tốc:", speedBoost)
 	setToggleText(HealthButton, "❤️ Thanh máu:", healthVisible)
 	setToggleText(StunButton, "🥴 Choáng:", stunActive)
+	setToggleText(AntiKnockButton, "🛡️ Chống văng:", antiKnockback)
 	setToggleText(RespawnButton, "♻️ Hồi sinh:", fastRespawn)
 	setToggleText(AutoAttackButton, "⚔️ Auto Đánh:", autoAttack)
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
@@ -697,8 +714,8 @@ local function applyInitialState()
 		end
 	end
 
-	if stunActive and LocalPlayer.Character then
-		setupStun(LocalPlayer.Character)
+	if (stunActive or antiKnockback) and LocalPlayer.Character then
+		setupDamageEffects(LocalPlayer.Character)
 	end
 
 	if fastRespawn and LocalPlayer.Character then
