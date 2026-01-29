@@ -31,7 +31,6 @@ local locatorEnabled = false
 local locatorConnection
 local locatorBillboards = {}
 local ignoreTeamEnabled = true
- codex/add-aim-head-menu-and-localization-g6nxpx
 local wallbangEnabled = true
 
 local function create(className, props)
@@ -309,7 +308,10 @@ local screenGui = create("ScreenGui", {
 	Name = "FancyMenu",
 	ResetOnSpawn = false,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	IgnoreGuiInset = true,
 })
+
+screenGui.Parent = playerGui
 
 local accessKey = "MEMAYBEO-HUB-2024"
 local requireKey = false
@@ -830,7 +832,6 @@ locatorToggle.Size = UDim2.new(0, 180, 0, 34)
 local teamToggle = createButton(pvpSection, "Ignore Team: ON")
 teamToggle.Size = UDim2.new(0, 180, 0, 34)
 
-codex/add-aim-head-menu-and-localization-g6nxpx
 local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
 wallbangToggle.Size = UDim2.new(0, 180, 0, 34)
 
@@ -898,6 +899,9 @@ pingButton.MouseButton1Click:Connect(function()
 end)
 
 local function setVisible(state)
+	if state then
+		main.Position = UDim2.new(0.5, -260, 0.5, -170)
+	end
 	main.Visible = state
 end
 
@@ -919,7 +923,7 @@ end)
 
 if not requireKey then
 	keyGate.Visible = false
-	main.Visible = true
+	setVisible(true)
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -932,8 +936,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		end
 	end
 end)
-
-screenGui.Parent = playerGui
 
 local drag = false
 local dragStart
