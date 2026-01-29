@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -24,6 +25,13 @@ local theme = {
 	stroke = Color3.fromRGB(55, 60, 75),
 }
 
+local autoAimEnabled = false
+local autoAimConnection
+local locatorEnabled = false
+local locatorConnection
+local locatorBillboards = {}
+local ignoreTeamEnabled = true
+
 local function create(className, props)
 	local inst = Instance.new(className)
 	for key, value in pairs(props or {}) do
@@ -36,6 +44,222 @@ local function tween(obj, props, time)
 	TweenService:Create(obj, TweenInfo.new(time or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
+local function getRoot()
+	local character = player.Character or player.CharacterAdded:Wait()
+	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHeadPart(targetPlayer)
+	if not targetPlayer then
+		return nil
+	end
+
+	local character = targetPlayer.Character
+	if not character then
+		return nil
+	end
+
+	local head = character:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		return head
+	end
+
+	local primary = character.PrimaryPart
+	if primary and primary:IsA("BasePart") then
+		return primary
+	end
+
+	return nil
+end
+
+local function getCandidatePlayers()
+	local candidates = {}
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other ~= player and (not ignoreTeamEnabled or other.Team ~= player.Team) then
+			table.insert(candidates, other)
+		end
+	end
+	return candidates
+end
+
+local function getNearestPlayer()
+	local root = getRoot()
+	if not root then
+		return nil, "Không tìm thấy HumanoidRootPart."
+	end
+
+	local nearest
+	local nearestDistance
+	for _, other in ipairs(getCandidatePlayers()) do
+		local head = getHeadPart(other)
+		if head then
+			local distance = (head.Position - root.Position).Magnitude
+			if not nearestDistance or distance < nearestDistance then
+				nearest = other
+				nearestDistance = distance
+			end
+		end
+	end
+
+	if not nearest then
+		return nil, "Không tìm thấy người chơi phù hợp."
+	end
+
+	return nearest, nearestDistance
+end
+
+local function createLocatorBillboard(targetPlayer, head)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "FancyLocator"
+	billboard.Size = UDim2.new(0, 160, 0, 34)
+	billboard.StudsOffset = Vector3.new(0, 2.6, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = head
+
+	local frame = Instance.new("Frame")
+	frame.BackgroundColor3 = theme.panel
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.Parent = billboard
+
+	create("UICorner", {
+		CornerRadius = UDim.new(0, 6),
+		Parent = frame,
+	})
+
+	create("UIStroke", {
+		Color = theme.stroke,
+		Thickness = 1,
+		Parent = frame,
+	})
+
+	local label = create("TextLabel", {
+		Name = "NameLabel",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -8, 1, 0),
+		Position = UDim2.new(0, 4, 0, 0),
+		Font = Enum.Font.GothamBold,
+		Text = targetPlayer.Name,
+		TextSize = 12,
+		TextColor3 = theme.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = frame,
+	})
+
+	locatorBillboards[targetPlayer] = billboard
+	return label
+end
+
+local function clearLocatorBillboards()
+	for target, billboard in pairs(locatorBillboards) do
+		if billboard then
+			billboard:Destroy()
+		end
+		locatorBillboards[target] = nil
+	end
+end
+
+local function setLocatorEnabled(enabled, statusLabel)
+	locatorEnabled = enabled
+	if locatorConnection then
+		locatorConnection:Disconnect()
+		locatorConnection = nil
+	end
+	clearLocatorBillboards()
+
+	if not enabled then
+		if statusLabel then
+			statusLabel.Text = "Status: Locator Off"
+		end
+		return
+	end
+
+	if statusLabel then
+		statusLabel.Text = "Status: Locating players..."
+	end
+	locatorConnection = RunService.RenderStepped:Connect(function()
+		local root = getRoot()
+		if not root then
+			return
+		end
+
+		local candidates = getCandidatePlayers()
+		for _, other in ipairs(candidates) do
+			local head = getHeadPart(other)
+			if head then
+				if not locatorBillboards[other] or not locatorBillboards[other].Parent then
+					createLocatorBillboard(other, head)
+				end
+				local billboard = locatorBillboards[other]
+				local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
+				if label then
+					local distance = (head.Position - root.Position).Magnitude
+					label.Text = string.format("%s • %.0fm", other.Name, distance)
+				end
+			end
+		end
+
+		for target, billboard in pairs(locatorBillboards) do
+			if not table.find(candidates, target) then
+				if billboard then
+					billboard:Destroy()
+				end
+				locatorBillboards[target] = nil
+			end
+		end
+	end)
+end
+
+local function setAutoAim(enabled, statusLabel)
+	autoAimEnabled = enabled
+	if autoAimConnection then
+		autoAimConnection:Disconnect()
+		autoAimConnection = nil
+	end
+
+	if not enabled then
+		if statusLabel then
+			statusLabel.Text = "Status: Auto Aim Off"
+		end
+		return
+	end
+
+	if statusLabel then
+		statusLabel.Text = "Status: Auto Aim Active"
+	end
+
+	autoAimConnection = RunService.RenderStepped:Connect(function()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		local root = getRoot()
+		if not root then
+			return
+		end
+
+		local target, distanceOrError = getNearestPlayer()
+		if not target then
+			if statusLabel then
+				statusLabel.Text = distanceOrError or "Status: No target"
+			end
+			return
+		end
+
+		local head = getHeadPart(target)
+		if not head then
+			return
+		end
+
+		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, head.Position)
+		if statusLabel then
+			statusLabel.Text = string.format("Status: Locked %s (%.0fm)", target.Name, distanceOrError)
+		end
+	end)
+end
+
 local screenGui = create("ScreenGui", {
 	Name = "FancyMenu",
 	ResetOnSpawn = false,
@@ -43,6 +267,7 @@ local screenGui = create("ScreenGui", {
 })
 
 local accessKey = "MEMAYBEO-HUB-2024"
+local requireKey = false
 local animeImageId = "rbxassetid://11924456731"
 
 local keyGate = create("Frame", {
@@ -551,17 +776,63 @@ local pvpStatus = create("TextLabel", {
 	Parent = pvpSection,
 })
 
-local pvpReady = false
-local pvpToggle = createButton(pvpSection, "Enable PVP Mode")
-pvpToggle.Size = UDim2.new(0, 180, 0, 34)
-pvpToggle.MouseButton1Click:Connect(function()
-	pvpReady = not pvpReady
-	if pvpReady then
-		pvpStatus.Text = "Status: Ready for PVP"
-		pvpToggle.Text = "Disable PVP Mode"
+local aimToggle = createButton(pvpSection, "Auto Aim: OFF")
+aimToggle.Size = UDim2.new(0, 180, 0, 34)
+
+local locatorToggle = createButton(pvpSection, "Locator: OFF")
+locatorToggle.Size = UDim2.new(0, 180, 0, 34)
+
+local teamToggle = createButton(pvpSection, "Ignore Team: ON")
+teamToggle.Size = UDim2.new(0, 180, 0, 34)
+
+local pingButton = createButton(pvpSection, "Ping Nearest")
+pingButton.Size = UDim2.new(0, 180, 0, 34)
+
+aimToggle.MouseButton1Click:Connect(function()
+	autoAimEnabled = not autoAimEnabled
+	if autoAimEnabled then
+		aimToggle.Text = "Auto Aim: ON"
 	else
-		pvpStatus.Text = "Status: Idle"
-		pvpToggle.Text = "Enable PVP Mode"
+		aimToggle.Text = "Auto Aim: OFF"
+	end
+	setAutoAim(autoAimEnabled, pvpStatus)
+end)
+
+locatorToggle.MouseButton1Click:Connect(function()
+	locatorEnabled = not locatorEnabled
+	if locatorEnabled then
+		locatorToggle.Text = "Locator: ON"
+	else
+		locatorToggle.Text = "Locator: OFF"
+	end
+	setLocatorEnabled(locatorEnabled, pvpStatus)
+end)
+
+teamToggle.MouseButton1Click:Connect(function()
+	ignoreTeamEnabled = not ignoreTeamEnabled
+	if ignoreTeamEnabled then
+		teamToggle.Text = "Ignore Team: ON"
+	else
+		teamToggle.Text = "Ignore Team: OFF"
+	end
+end)
+
+pingButton.MouseButton1Click:Connect(function()
+	local target, distanceOrError = getNearestPlayer()
+	if not target then
+		pvpStatus.Text = distanceOrError or "Status: Không thể định vị."
+		return
+	end
+
+	local head = getHeadPart(target)
+	if not head then
+		pvpStatus.Text = "Status: Không thể xác định vị trí."
+		return
+	end
+
+	pvpStatus.Text = string.format("Status: Nearest %s (%.0fm)", target.Name, distanceOrError)
+	if setclipboard then
+		setclipboard(string.format("CFrame.new(%.2f, %.2f, %.2f)", head.Position.X, head.Position.Y, head.Position.Z))
 	end
 end)
 
@@ -584,6 +855,11 @@ keyButton.MouseButton1Click:Connect(function()
 		keyStatus.TextColor3 = Color3.fromRGB(248, 113, 113)
 	end
 end)
+
+if not requireKey then
+	keyGate.Visible = false
+	main.Visible = true
+end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
