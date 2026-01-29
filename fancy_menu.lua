@@ -32,6 +32,11 @@ local locatorConnection
 local locatorBillboards = {}
 local ignoreTeamEnabled = true
 local wallbangEnabled = true
+local infiniteAmmoEnabled = false
+local fastReloadEnabled = false
+local ammoConnection
+local ammoOriginals = {}
+local minimized = false
 
 local function create(className, props)
 	local inst = Instance.new(className)
@@ -73,6 +78,11 @@ local function getHeadPart(targetPlayer)
 
 	local character = targetPlayer.Character
 	if not character then
+		return nil
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
 		return nil
 	end
 
@@ -304,6 +314,111 @@ local function setAutoAim(enabled, statusLabel)
 	end)
 end
 
+local AMMO_VALUE_NAMES = {
+	Ammo = true,
+	AmmoInClip = true,
+	Clip = true,
+	ClipAmmo = true,
+	CurrentAmmo = true,
+	ReserveAmmo = true,
+	StoredAmmo = true,
+}
+
+local MAX_AMMO_NAMES = {
+	MaxAmmo = true,
+	MaxClip = true,
+	ClipSize = true,
+	MagazineSize = true,
+}
+
+local RELOAD_VALUE_NAMES = {
+	ReloadTime = true,
+	ReloadSpeed = true,
+	ReloadDuration = true,
+}
+
+local function findMaxAmmo(tool)
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+			if MAX_AMMO_NAMES[descendant.Name] then
+				return descendant.Value
+			end
+		end
+	end
+	return nil
+end
+
+local function applyAmmoSettings(tool)
+	if not tool then
+		return
+	end
+
+	local maxAmmo = findMaxAmmo(tool)
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+			if infiniteAmmoEnabled and AMMO_VALUE_NAMES[descendant.Name] then
+				local targetValue = maxAmmo or descendant.Value
+				descendant.Value = targetValue
+			end
+
+			if fastReloadEnabled and RELOAD_VALUE_NAMES[descendant.Name] then
+				if ammoOriginals[descendant] == nil then
+					ammoOriginals[descendant] = descendant.Value
+				end
+				descendant.Value = math.max(0.05, descendant.Value * 0.2)
+			elseif not fastReloadEnabled and ammoOriginals[descendant] ~= nil then
+				descendant.Value = ammoOriginals[descendant]
+				ammoOriginals[descendant] = nil
+			end
+		end
+	end
+end
+
+local function updateAmmoForCharacter(character)
+	if not character then
+		return
+	end
+
+	for _, item in ipairs(character:GetChildren()) do
+		if item:IsA("Tool") then
+			applyAmmoSettings(item)
+		end
+	end
+
+	local backpack = player:FindFirstChild("Backpack")
+	if backpack then
+		for _, item in ipairs(backpack:GetChildren()) do
+			if item:IsA("Tool") then
+				applyAmmoSettings(item)
+			end
+		end
+	end
+end
+
+local function setAmmoHelpersEnabled()
+	if ammoConnection then
+		ammoConnection:Disconnect()
+		ammoConnection = nil
+	end
+
+	if not (infiniteAmmoEnabled or fastReloadEnabled) then
+		for value, original in pairs(ammoOriginals) do
+			if value and value.Parent then
+				value.Value = original
+			end
+			ammoOriginals[value] = nil
+		end
+		return
+	end
+
+	ammoConnection = RunService.RenderStepped:Connect(function()
+		local character = getCharacter()
+		if character then
+			updateAmmoForCharacter(character)
+		end
+	end)
+end
+
 local screenGui = create("ScreenGui", {
 	Name = "FancyMenu",
 	ResetOnSpawn = false,
@@ -500,6 +615,23 @@ create("UICorner", {
 	Parent = closeButton,
 })
 
+local minimizeButton = create("TextButton", {
+	Name = "Minimize",
+	Size = UDim2.new(0, 28, 0, 28),
+	Position = UDim2.new(1, -70, 0.5, -14),
+	BackgroundColor3 = theme.panel,
+	Text = "–",
+	Font = Enum.Font.GothamBold,
+	TextColor3 = theme.muted,
+	TextSize = 18,
+	Parent = topBar,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 8),
+	Parent = minimizeButton,
+})
+
 local tabBar = create("Frame", {
 	Name = "TabBar",
 	Size = UDim2.new(0, 160, 1, -48),
@@ -535,6 +667,27 @@ local content = create("Frame", {
 	BackgroundTransparency = 1,
 	Parent = main,
 })
+
+local fullSize = main.Size
+local minimizedSize = UDim2.new(0, 520, 0, 48)
+
+local function applyMinimizeState()
+	if minimized then
+		main.Size = minimizedSize
+		tabBar.Visible = false
+		content.Visible = false
+		if hint then
+			hint.Visible = false
+		end
+	else
+		main.Size = fullSize
+		tabBar.Visible = true
+		content.Visible = true
+		if hint then
+			hint.Visible = true
+		end
+	end
+end
 
 local heroArt = create("ImageLabel", {
 	Name = "HeroArt",
@@ -835,6 +988,12 @@ teamToggle.Size = UDim2.new(0, 180, 0, 34)
 local wallbangToggle = createButton(pvpSection, "Wallbang: ON")
 wallbangToggle.Size = UDim2.new(0, 180, 0, 34)
 
+local infiniteAmmoToggle = createButton(pvpSection, "Infinite Ammo: OFF")
+infiniteAmmoToggle.Size = UDim2.new(0, 180, 0, 34)
+
+local fastReloadToggle = createButton(pvpSection, "Fast Reload: OFF")
+fastReloadToggle.Size = UDim2.new(0, 180, 0, 34)
+
 local pingButton = createButton(pvpSection, "Ping Nearest")
 pingButton.Size = UDim2.new(0, 180, 0, 34)
 
@@ -879,6 +1038,26 @@ wallbangToggle.MouseButton1Click:Connect(function()
 	end
 end)
 
+infiniteAmmoToggle.MouseButton1Click:Connect(function()
+	infiniteAmmoEnabled = not infiniteAmmoEnabled
+	if infiniteAmmoEnabled then
+		infiniteAmmoToggle.Text = "Infinite Ammo: ON"
+	else
+		infiniteAmmoToggle.Text = "Infinite Ammo: OFF"
+	end
+	setAmmoHelpersEnabled()
+end)
+
+fastReloadToggle.MouseButton1Click:Connect(function()
+	fastReloadEnabled = not fastReloadEnabled
+	if fastReloadEnabled then
+		fastReloadToggle.Text = "Fast Reload: ON"
+	else
+		fastReloadToggle.Text = "Fast Reload: OFF"
+	end
+	setAmmoHelpersEnabled()
+end)
+
 pingButton.MouseButton1Click:Connect(function()
 	local target, distanceOrError = getNearestPlayer()
 	if not target then
@@ -903,10 +1082,18 @@ local function setVisible(state)
 		main.Position = UDim2.new(0.5, -260, 0.5, -170)
 	end
 	main.Visible = state
+	if state then
+		applyMinimizeState()
+	end
 end
 
 closeButton.MouseButton1Click:Connect(function()
 	setVisible(false)
+end)
+
+minimizeButton.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	applyMinimizeState()
 end)
 
 keyButton.MouseButton1Click:Connect(function()
@@ -937,6 +1124,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
+player.CharacterAdded:Connect(function()
+	if infiniteAmmoEnabled or fastReloadEnabled then
+		setAmmoHelpersEnabled()
+	end
+end)
+
 local drag = false
 local dragStart
 local startPos
@@ -946,7 +1139,7 @@ local function updateDrag(input)
 	main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-local function beginDrag(input)
+	local function beginDrag(input)
 	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 		return
 	end
@@ -983,6 +1176,8 @@ local hint = create("TextLabel", {
 	TextXAlignment = Enum.TextXAlignment.Center,
 	Parent = main,
 })
+
+applyMinimizeState()
 
 create("UIGradient", {
 	Color = ColorSequence.new({
