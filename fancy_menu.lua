@@ -40,6 +40,11 @@ local minimized = false
 local silentAimEnabled = false
 local silentAimHooked = false
 local originalNamecall
+local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
+local aimPartIndex = 1
+local hitboxEnabled = false
+local hitboxConnection
+local hitboxOriginals = {}
 
 local function create(className, props)
 	local inst = Instance.new(className)
@@ -102,6 +107,30 @@ local function getHeadPart(targetPlayer)
 	return nil
 end
 
+local function getAimPart(targetPlayer)
+	if not targetPlayer then
+		return nil
+	end
+
+	local character = targetPlayer.Character
+	if not character then
+		return nil
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		return nil
+	end
+
+	local partName = aimParts[aimPartIndex] or "Head"
+	local part = character:FindFirstChild(partName)
+	if part and part:IsA("BasePart") then
+		return part
+	end
+
+	return getHeadPart(targetPlayer)
+end
+
 local function getCandidatePlayers()
 	local candidates = {}
 	for _, other in ipairs(Players:GetPlayers()) do
@@ -123,9 +152,9 @@ local function getNearestPlayer()
 	local nearest
 	local nearestDistance
 	for _, other in ipairs(getCandidatePlayers()) do
-		local head = getHeadPart(other)
-		if head then
-			local distance = (head.Position - origin).Magnitude
+		local part = getAimPart(other)
+		if part then
+			local distance = (part.Position - origin).Magnitude
 			if not nearestDistance or distance < nearestDistance then
 				nearest = other
 				nearestDistance = distance
@@ -221,19 +250,19 @@ local function setLocatorEnabled(enabled, statusLabel)
 		end
 
 		local candidates = getCandidatePlayers()
-		for _, other in ipairs(candidates) do
-			local head = getHeadPart(other)
-			if head then
-				if not locatorBillboards[other] or not locatorBillboards[other].Parent then
-					createLocatorBillboard(other, head)
+			for _, other in ipairs(candidates) do
+				local part = getAimPart(other)
+				if part then
+					if not locatorBillboards[other] or not locatorBillboards[other].Parent then
+						createLocatorBillboard(other, part)
+					end
+					local billboard = locatorBillboards[other]
+					local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
+					if label then
+						local distance = (part.Position - origin).Magnitude
+						label.Text = string.format("%s • %.0fm", other.Name, distance)
+					end
 				end
-				local billboard = locatorBillboards[other]
-				local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
-				if label then
-					local distance = (head.Position - origin).Magnitude
-					label.Text = string.format("%s • %.0fm", other.Name, distance)
-				end
-			end
 		end
 
 		for target, billboard in pairs(locatorBillboards) do
@@ -291,14 +320,14 @@ local function setAutoAim(enabled, statusLabel)
 			return
 		end
 
-		local head = getHeadPart(target)
-		if not head then
+		local part = getAimPart(target)
+		if not part then
 			return
 		end
 
 		if not wallbangEnabled and workspace and workspace.Raycast then
 			local origin = camera.CFrame.Position
-			local direction = head.Position - origin
+			local direction = part.Position - origin
 			local rayParams = RaycastParams.new()
 			rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 			local character = getCharacter()
@@ -308,7 +337,7 @@ local function setAutoAim(enabled, statusLabel)
 				rayParams.FilterDescendantsInstances = {}
 			end
 			local result = workspace:Raycast(origin, direction, rayParams)
-			if result and result.Instance and not result.Instance:IsDescendantOf(head.Parent) then
+			if result and result.Instance and not result.Instance:IsDescendantOf(part.Parent) then
 				if statusLabel then
 					statusLabel.Text = "Status: Target blocked"
 				end
@@ -316,7 +345,7 @@ local function setAutoAim(enabled, statusLabel)
 			end
 		end
 
-		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, head.Position)
+		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, part.Position)
 		if statusLabel then
 			statusLabel.Text = string.format("Status: Locked %s (%.0fm)", target.Name, distanceOrError)
 		end
@@ -428,6 +457,55 @@ local function setAmmoHelpersEnabled()
 	end)
 end
 
+local function applyHitbox(playerTarget)
+	local part = getAimPart(playerTarget)
+	if not part then
+		return
+	end
+
+	if hitboxEnabled then
+		if not hitboxOriginals[part] then
+			hitboxOriginals[part] = {
+				Size = part.Size,
+				Transparency = part.Transparency,
+			}
+		end
+		part.Size = part.Size * 1.6
+		part.Transparency = math.max(part.Transparency, 0.35)
+	else
+		local original = hitboxOriginals[part]
+		if original then
+			part.Size = original.Size
+			part.Transparency = original.Transparency
+			hitboxOriginals[part] = nil
+		end
+	end
+end
+
+local function setHitboxEnabled()
+	if hitboxConnection then
+		hitboxConnection:Disconnect()
+		hitboxConnection = nil
+	end
+
+	if not hitboxEnabled then
+		for part, original in pairs(hitboxOriginals) do
+			if part and part.Parent then
+				part.Size = original.Size
+				part.Transparency = original.Transparency
+			end
+			hitboxOriginals[part] = nil
+		end
+		return
+	end
+
+	hitboxConnection = RunService.RenderStepped:Connect(function()
+		for _, other in ipairs(getCandidatePlayers()) do
+			applyHitbox(other)
+		end
+	end)
+end
+
 local function ensureSilentAimHook()
 	if silentAimHooked then
 		return
@@ -449,12 +527,12 @@ local function ensureSilentAimHook()
 
 			if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
 				local target, _ = getNearestPlayer()
-				local head = target and getHeadPart(target)
-				if head then
-					args[2] = head.Position - origin
+				local part = target and getAimPart(target)
+				if part then
+					args[2] = part.Position - origin
 					if wallbangEnabled and rayParams and typeof(rayParams) == "Instance" and rayParams:IsA("RaycastParams") then
 						rayParams.FilterType = Enum.RaycastFilterType.Whitelist
-						rayParams.FilterDescendantsInstances = {head.Parent}
+						rayParams.FilterDescendantsInstances = {part.Parent}
 					end
 					return originalNamecall(self, table.unpack(args))
 				end
@@ -475,7 +553,7 @@ local screenGui = create("ScreenGui", {
 screenGui.Parent = playerGui
 
 local accessKey = "MEMAYBEO-HUB-2024"
-local requireKey = false
+local requireKey = true
 local animeImageId = "rbxassetid://11924456731"
 
 local keyGate = create("Frame", {
@@ -1043,6 +1121,12 @@ fastReloadToggle.Size = UDim2.new(0, 180, 0, 34)
 local silentAimToggle = createButton(pvpSection, "Head Magnet: OFF")
 silentAimToggle.Size = UDim2.new(0, 180, 0, 34)
 
+local aimPartToggle = createButton(pvpSection, "Aim Part: Head")
+aimPartToggle.Size = UDim2.new(0, 180, 0, 34)
+
+local hitboxToggle = createButton(pvpSection, "Hitbox: OFF")
+hitboxToggle.Size = UDim2.new(0, 180, 0, 34)
+
 local pingButton = createButton(pvpSection, "Ping Nearest")
 pingButton.Size = UDim2.new(0, 180, 0, 34)
 
@@ -1117,6 +1201,24 @@ silentAimToggle.MouseButton1Click:Connect(function()
 		silentAimToggle.Text = "Head Magnet: OFF"
 		pvpStatus.Text = "Status: Head Magnet disabled"
 	end
+end)
+
+aimPartToggle.MouseButton1Click:Connect(function()
+	aimPartIndex = aimPartIndex + 1
+	if aimPartIndex > #aimParts then
+		aimPartIndex = 1
+	end
+	aimPartToggle.Text = "Aim Part: " .. (aimParts[aimPartIndex] or "Head")
+end)
+
+hitboxToggle.MouseButton1Click:Connect(function()
+	hitboxEnabled = not hitboxEnabled
+	if hitboxEnabled then
+		hitboxToggle.Text = "Hitbox: ON"
+	else
+		hitboxToggle.Text = "Hitbox: OFF"
+	end
+	setHitboxEnabled()
 end)
 
 pingButton.MouseButton1Click:Connect(function()
