@@ -320,7 +320,10 @@ end
 local function getCandidatePlayers()
 	local candidates = {}
 	for _, other in ipairs(Players:GetPlayers()) do
-		if other ~= player and (not ignoreTeamEnabled or other.Team ~= player.Team) then
+		if other ~= player then
+			if ignoreTeamEnabled and player.Team ~= nil and other.Team ~= nil and other.Team == player.Team then
+				continue
+			end
 			table.insert(candidates, other)
 		end
 	end
