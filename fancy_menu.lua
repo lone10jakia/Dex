@@ -42,14 +42,195 @@ local silentAimHooked = false
 local originalNamecall
 local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
 local aimPartLabels = {
-	Head = "Đầu",
-	UpperTorso = "Thân trên",
-	HumanoidRootPart = "Thân giữa",
+	vi = {
+		Head = "Đầu",
+		UpperTorso = "Thân trên",
+		HumanoidRootPart = "Thân giữa",
+	},
+	en = {
+		Head = "Head",
+		UpperTorso = "Upper Torso",
+		HumanoidRootPart = "Root",
+	},
 }
 local aimPartIndex = 1
 local hitboxEnabled = false
 local hitboxConnection
 local hitboxOriginals = {}
+local currentLanguage = "vi"
+local configKey = "_FancyMenuConfig"
+local savedConfig = rawget(_G, configKey)
+
+local languageStrings = {
+	vi = {
+		tab_player = "Nhân vật",
+		tab_world = "Thế giới",
+		tab_utility = "Tiện ích",
+		tab_pvp = "PVP",
+		tab_settings = "Cài đặt",
+		section_player = "Điều khiển nhân vật",
+		section_world = "Cài đặt thế giới",
+		section_utility = "Công cụ tiện ích",
+		section_pvp = "Công cụ PVP",
+		section_settings = "Tùy chỉnh",
+		key_title = "MEMAYBEO HUB Mã truy cập",
+		key_subtitle = "Nhập mã để mở menu",
+		key_placeholder = "Nhập mã (vd: MEMAYBEO-HUB-2024)",
+		key_required = "Cần mã truy cập.",
+		key_unlock = "Mở khóa",
+		key_success = "Đã xác thực.",
+		key_invalid = "Sai mã. Thử lại.",
+		menu_title = "MEMAYBEO HUB Menu đa chức năng",
+		hint = "Nhấn RightShift để ẩn/hiện menu",
+		status_idle = "Trạng thái: Sẵn sàng",
+		status_locator_off = "Trạng thái: Tắt định vị",
+		status_locator_on = "Trạng thái: Đang định vị...",
+		status_auto_off = "Trạng thái: Tắt tự ngắm",
+		status_auto_on = "Trạng thái: Tự ngắm hoạt động",
+		status_wait_respawn = "Trạng thái: Chờ hồi sinh",
+		status_target_blocked = "Trạng thái: Mục tiêu bị che",
+		status_locked = "Trạng thái: Khóa %s (%.0fm)",
+		status_no_target = "Trạng thái: Không có mục tiêu",
+		no_enemy = "Không tìm thấy người chơi phù hợp.",
+		status_locate_fail = "Trạng thái: Không thể định vị.",
+		status_target_fail = "Trạng thái: Không thể xác định vị trí.",
+		status_nearest = "Trạng thái: Gần nhất %s (%.0fm)",
+		status_headmagnet_on = "Trạng thái: Bật hút đầu",
+		status_headmagnet_off = "Trạng thái: Tắt hút đầu",
+		walkspeed = "Tốc độ chạy (16)",
+		jumppower = "Sức bật (50)",
+		apply = "Áp dụng",
+		reset = "Đặt lại",
+		time = "Giờ (0-24)",
+		apply_time = "Áp dụng giờ",
+		fullbright = "Bật/Tắt sáng",
+		rejoin = "Vào lại server",
+		copy_pos = "Sao chép vị trí",
+		auto_on = "Tự ngắm: BẬT",
+		auto_off = "Tự ngắm: TẮT",
+		locator_on = "Định vị: BẬT",
+		locator_off = "Định vị: TẮT",
+		ignore_team_on = "Bỏ qua team: BẬT",
+		ignore_team_off = "Bỏ qua team: TẮT",
+		wallbang_on = "Xuyên tường: BẬT",
+		wallbang_off = "Xuyên tường: TẮT",
+		infinite_on = "Đạn vô hạn: BẬT",
+		infinite_off = "Đạn vô hạn: TẮT",
+		reload_on = "Nạp nhanh: BẬT",
+		reload_off = "Nạp nhanh: TẮT",
+		headmagnet_on = "Hút đầu: BẬT",
+		headmagnet_off = "Hút đầu: TẮT",
+		aim_part = "Vị trí ngắm: %s",
+		hitbox_on = "Vùng trúng: BẬT",
+		hitbox_off = "Vùng trúng: TẮT",
+		ping = "Ping gần nhất",
+		save_settings = "Lưu cài đặt",
+		clear_settings = "Xóa lưu",
+		language_toggle = "Ngôn ngữ: Việt",
+		settings_saved = "Trạng thái: Đã lưu cài đặt",
+		settings_cleared = "Trạng thái: Đã xóa lưu",
+	},
+	en = {
+		tab_player = "Player",
+		tab_world = "World",
+		tab_utility = "Utility",
+		tab_pvp = "PVP",
+		tab_settings = "Settings",
+		section_player = "Player Controls",
+		section_world = "World Settings",
+		section_utility = "Utility Tools",
+		section_pvp = "PVP Toolkit",
+		section_settings = "Preferences",
+		key_title = "MEMAYBEO HUB Access Key",
+		key_subtitle = "Enter the key to unlock the menu",
+		key_placeholder = "Enter key (ex: MEMAYBEO-HUB-2024)",
+		key_required = "Key required.",
+		key_unlock = "Unlock",
+		key_success = "Access granted.",
+		key_invalid = "Invalid key. Try again.",
+		menu_title = "MEMAYBEO HUB Multi-Function Menu",
+		hint = "Press RightShift to toggle menu",
+		status_idle = "Status: Ready",
+		status_locator_off = "Status: Locator Off",
+		status_locator_on = "Status: Locating players...",
+		status_auto_off = "Status: Auto aim off",
+		status_auto_on = "Status: Auto aim active",
+		status_wait_respawn = "Status: Waiting for respawn",
+		status_target_blocked = "Status: Target blocked",
+		status_locked = "Status: Locked %s (%.0fm)",
+		status_no_target = "Status: No target",
+		no_enemy = "No suitable player found.",
+		status_locate_fail = "Status: Unable to locate.",
+		status_target_fail = "Status: Cannot resolve target.",
+		status_nearest = "Status: Nearest %s (%.0fm)",
+		status_headmagnet_on = "Status: Head magnet enabled",
+		status_headmagnet_off = "Status: Head magnet disabled",
+		walkspeed = "WalkSpeed (16)",
+		jumppower = "JumpPower (50)",
+		apply = "Apply",
+		reset = "Reset",
+		time = "Time (0-24)",
+		apply_time = "Apply Time",
+		fullbright = "Toggle Fullbright",
+		rejoin = "Rejoin Server",
+		copy_pos = "Copy Position",
+		auto_on = "Auto aim: ON",
+		auto_off = "Auto aim: OFF",
+		locator_on = "Locator: ON",
+		locator_off = "Locator: OFF",
+		ignore_team_on = "Ignore team: ON",
+		ignore_team_off = "Ignore team: OFF",
+		wallbang_on = "Wallbang: ON",
+		wallbang_off = "Wallbang: OFF",
+		infinite_on = "Infinite ammo: ON",
+		infinite_off = "Infinite ammo: OFF",
+		reload_on = "Fast reload: ON",
+		reload_off = "Fast reload: OFF",
+		headmagnet_on = "Head magnet: ON",
+		headmagnet_off = "Head magnet: OFF",
+		aim_part = "Aim part: %s",
+		hitbox_on = "Hitbox: ON",
+		hitbox_off = "Hitbox: OFF",
+		ping = "Ping Nearest",
+		save_settings = "Save settings",
+		clear_settings = "Clear saved",
+		language_toggle = "Language: English",
+		settings_saved = "Status: Settings saved",
+		settings_cleared = "Status: Saved cleared",
+	},
+}
+
+if savedConfig and type(savedConfig) == "table" and languageStrings[savedConfig.language] then
+	currentLanguage = savedConfig.language
+end
+
+local function getText(key)
+	local lang = languageStrings[currentLanguage] or languageStrings.vi
+	return lang[key] or key
+end
+
+local function getAimPartLabel()
+	local labels = aimPartLabels[currentLanguage] or aimPartLabels.vi
+	return labels[aimParts[aimPartIndex]] or labels.Head
+end
+
+local function applySavedConfig()
+	if not savedConfig or type(savedConfig) ~= "table" then
+		return
+	end
+
+	autoAimEnabled = savedConfig.autoAimEnabled or false
+	locatorEnabled = savedConfig.locatorEnabled or false
+	ignoreTeamEnabled = savedConfig.ignoreTeamEnabled ~= false
+	wallbangEnabled = savedConfig.wallbangEnabled or false
+	infiniteAmmoEnabled = savedConfig.infiniteAmmoEnabled or false
+	fastReloadEnabled = savedConfig.fastReloadEnabled or false
+	silentAimEnabled = savedConfig.silentAimEnabled or false
+	hitboxEnabled = savedConfig.hitboxEnabled or false
+	if type(savedConfig.aimPartIndex) == "number" then
+		aimPartIndex = math.max(1, math.min(#aimParts, savedConfig.aimPartIndex))
+	end
+end
 
 local function create(className, props)
 	local inst = Instance.new(className)
@@ -168,7 +349,7 @@ local function getNearestPlayer()
 	end
 
 	if not nearest then
-		return nil, "Không tìm thấy người chơi phù hợp."
+		return nil, getText("no_enemy")
 	end
 
 	return nearest, nearestDistance
@@ -236,13 +417,13 @@ local function setLocatorEnabled(enabled, statusLabel)
 
 	if not enabled then
 		if statusLabel then
-			statusLabel.Text = "Trạng thái: Tắt định vị"
+			setStatusLabel(statusLabel, "status_locator_off")
 		end
 		return
 	end
 
 	if statusLabel then
-		statusLabel.Text = "Trạng thái: Đang định vị..."
+		setStatusLabel(statusLabel, "status_locator_on")
 	end
 	locatorConnection = RunService.RenderStepped:Connect(function()
 		local origin
@@ -290,13 +471,13 @@ local function setAutoAim(enabled, statusLabel)
 
 	if not enabled then
 		if statusLabel then
-				statusLabel.Text = "Trạng thái: Tắt tự ngắm"
+			setStatusLabel(statusLabel, "status_auto_off")
 		end
 		return
 	end
 
 	if statusLabel then
-		statusLabel.Text = "Trạng thái: Tự ngắm hoạt động"
+		setStatusLabel(statusLabel, "status_auto_on")
 	end
 
 	autoAimConnection = RunService.RenderStepped:Connect(function()
@@ -307,7 +488,7 @@ local function setAutoAim(enabled, statusLabel)
 
 		if not isCharacterAlive() then
 			if statusLabel then
-				statusLabel.Text = "Trạng thái: Chờ hồi sinh"
+				setStatusLabel(statusLabel, "status_wait_respawn")
 			end
 			return
 		end
@@ -320,7 +501,11 @@ local function setAutoAim(enabled, statusLabel)
 		local target, distanceOrError = getNearestPlayer()
 		if not target then
 			if statusLabel then
-				statusLabel.Text = distanceOrError or "Trạng thái: Không có mục tiêu"
+				if distanceOrError then
+					statusLabel.Text = distanceOrError
+				else
+					setStatusLabel(statusLabel, "status_no_target")
+				end
 			end
 			return
 		end
@@ -344,7 +529,7 @@ local function setAutoAim(enabled, statusLabel)
 			local result = workspace:Raycast(origin, direction, rayParams)
 			if result and result.Instance and not result.Instance:IsDescendantOf(part.Parent) then
 				if statusLabel then
-					statusLabel.Text = "Trạng thái: Mục tiêu bị che"
+					setStatusLabel(statusLabel, "status_target_blocked")
 				end
 				return
 			end
@@ -352,9 +537,29 @@ local function setAutoAim(enabled, statusLabel)
 
 		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, part.Position)
 		if statusLabel then
-			statusLabel.Text = string.format("Trạng thái: Khóa %s (%.0fm)", target.Name, distanceOrError)
+			setStatusLabel(statusLabel, "status_locked", target.Name, distanceOrError)
 		end
 	end)
+end
+
+local function setStatusLabel(label, key, ...)
+	if not label then
+		return
+	end
+	local text = getText(key)
+	if select("#", ...) > 0 then
+		text = string.format(text, ...)
+	end
+	label.Text = text
+end
+
+local currentStatusKey = "status_idle"
+local currentStatusArgs = {}
+
+local function setPvpStatus(key, ...)
+	currentStatusKey = key
+	currentStatusArgs = {...}
+	setStatusLabel(pvpStatus, key, ...)
 end
 
 local AMMO_VALUE_NAMES = {
@@ -607,7 +812,7 @@ local keyTitle = create("TextLabel", {
 	Size = UDim2.new(1, -24, 0, 28),
 	Position = UDim2.new(0, 12, 0, 12),
 	Font = Enum.Font.GothamBold,
-	Text = "MEMAYBEO HUB Mã truy cập",
+	Text = getText("key_title"),
 	TextSize = 20,
 	TextColor3 = theme.text,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -619,7 +824,7 @@ local keySubtitle = create("TextLabel", {
 	Size = UDim2.new(1, -24, 0, 18),
 	Position = UDim2.new(0, 12, 0, 44),
 	Font = Enum.Font.Gotham,
-	Text = "Nhập mã để mở menu",
+	Text = getText("key_subtitle"),
 	TextSize = 12,
 	TextColor3 = theme.muted,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -646,7 +851,7 @@ local keyInput = create("TextBox", {
 	Position = UDim2.new(0, 12, 0, 120),
 	Font = Enum.Font.GothamSemibold,
 	Text = "",
-	PlaceholderText = "Nhập mã (vd: MEMAYBEO-HUB-2024)",
+	PlaceholderText = getText("key_placeholder"),
 	TextSize = 13,
 	TextColor3 = theme.text,
 	PlaceholderColor3 = theme.muted,
@@ -670,7 +875,7 @@ local keyStatus = create("TextLabel", {
 	Size = UDim2.new(1, -24, 0, 18),
 	Position = UDim2.new(0, 12, 0, 164),
 	Font = Enum.Font.Gotham,
-	Text = "Cần mã truy cập.",
+	Text = getText("key_required"),
 	TextSize = 12,
 	TextColor3 = theme.muted,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -682,7 +887,7 @@ local keyButton = create("TextButton", {
 	Size = UDim2.new(0, 140, 0, 34),
 	Position = UDim2.new(0, 12, 1, -50),
 	Font = Enum.Font.GothamBold,
-	Text = "Mở khóa",
+	Text = getText("key_unlock"),
 	TextSize = 13,
 	TextColor3 = theme.text,
 	AutoButtonColor = false,
@@ -734,7 +939,7 @@ local title = create("TextLabel", {
 	Size = UDim2.new(1, -48, 1, 0),
 	Position = UDim2.new(0, 20, 0, 0),
 	Font = Enum.Font.GothamBold,
-	Text = "MEMAYBEO HUB Menu đa chức năng",
+	Text = getText("menu_title"),
 	TextSize = 18,
 	TextColor3 = theme.text,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -874,7 +1079,7 @@ local function createSection(parent, titleText)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = section,
 	})
-	return section
+	return section, titleLabel
 end
 
 local function createButton(parent, text)
@@ -934,12 +1139,12 @@ end
 local tabs = {}
 local pages = {}
 
-local function createTab(name)
+local function createTab(key)
 	local tabButton = create("TextButton", {
 		BackgroundColor3 = theme.panel,
 		Size = UDim2.new(1, 0, 0, 36),
 		Font = Enum.Font.GothamSemibold,
-		Text = name,
+		Text = getText("tab_" .. key),
 		TextSize = 13,
 		TextColor3 = theme.text,
 		AutoButtonColor = false,
@@ -970,8 +1175,8 @@ local function createTab(name)
 		Parent = page,
 	})
 
-	tabs[name] = tabButton
-	pages[name] = page
+	tabs[key] = tabButton
+	pages[key] = page
 
 	tabButton.MouseButton1Click:Connect(function()
 		for tabName, button in pairs(tabs) do
@@ -985,21 +1190,23 @@ local function createTab(name)
 	return page
 end
 
-local playerTabName = "Nhân vật"
-local worldTabName = "Thế giới"
-local utilityTabName = "Tiện ích"
-local pvpTabName = "PVP"
+local playerTabName = "player"
+local worldTabName = "world"
+local utilityTabName = "utility"
+local pvpTabName = "pvp"
+local settingsTabName = "settings"
 
 local playerPage = createTab(playerTabName)
 local worldPage = createTab(worldTabName)
 local utilityPage = createTab(utilityTabName)
 local pvpPage = createTab(pvpTabName)
+local settingsPage = createTab(settingsTabName)
 
 tabs[playerTabName].BackgroundColor3 = theme.accent
 pages[playerTabName].Visible = true
 
 -- Nhân vật section
-local playerSection = createSection(playerPage, "Điều khiển nhân vật")
+local playerSection, playerSectionTitle = createSection(playerPage, getText("section_player"))
 local playerLayout = create("UIListLayout", {
 	Padding = UDim.new(0, 8),
 	FillDirection = Enum.FillDirection.Horizontal,
@@ -1009,9 +1216,9 @@ local playerLayout = create("UIListLayout", {
 playerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 playerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-local walkSpeedInput = createInput(playerSection, "Tốc độ chạy (16)")
-local jumpPowerInput = createInput(playerSection, "Sức bật (50)")
-local applyPlayerButton = createButton(playerSection, "Áp dụng")
+local walkSpeedInput = createInput(playerSection, getText("walkspeed"))
+local jumpPowerInput = createInput(playerSection, getText("jumppower"))
+local applyPlayerButton = createButton(playerSection, getText("apply"))
 
 applyPlayerButton.MouseButton1Click:Connect(function()
 	local character = player.Character or player.CharacterAdded:Wait()
@@ -1029,7 +1236,7 @@ applyPlayerButton.MouseButton1Click:Connect(function()
 	end
 end)
 
-local resetButton = createButton(playerSection, "Đặt lại")
+local resetButton = createButton(playerSection, getText("reset"))
 resetButton.MouseButton1Click:Connect(function()
 	local character = player.Character or player.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -1040,7 +1247,7 @@ resetButton.MouseButton1Click:Connect(function()
 end)
 
 -- Thế giới section
-local worldSection = createSection(worldPage, "Cài đặt thế giới")
+local worldSection, worldSectionTitle = createSection(worldPage, getText("section_world"))
 local worldLayout = create("UIListLayout", {
 	Padding = UDim.new(0, 8),
 	FillDirection = Enum.FillDirection.Horizontal,
@@ -1050,8 +1257,8 @@ local worldLayout = create("UIListLayout", {
 worldLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 worldLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-local timeInput = createInput(worldSection, "Giờ (0-24)")
-local applyTimeButton = createButton(worldSection, "Áp dụng giờ")
+local timeInput = createInput(worldSection, getText("time"))
+local applyTimeButton = createButton(worldSection, getText("apply_time"))
 applyTimeButton.MouseButton1Click:Connect(function()
 	local value = tonumber(timeInput.Text)
 	if value then
@@ -1059,8 +1266,10 @@ applyTimeButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+setPvpStatus("status_idle")
+
 local fullbright = false
-local fullbrightButton = createButton(worldSection, "Bật/Tắt sáng")
+local fullbrightButton = createButton(worldSection, getText("fullbright"))
 fullbrightButton.MouseButton1Click:Connect(function()
 	fullbright = not fullbright
 	if fullbright then
@@ -1075,7 +1284,7 @@ fullbrightButton.MouseButton1Click:Connect(function()
 end)
 
 -- Tiện ích section
-local utilSection = createSection(utilityPage, "Công cụ tiện ích")
+local utilSection, utilSectionTitle = createSection(utilityPage, getText("section_utility"))
 local utilLayout = create("UIListLayout", {
 	Padding = UDim.new(0, 8),
 	FillDirection = Enum.FillDirection.Horizontal,
@@ -1085,12 +1294,12 @@ local utilLayout = create("UIListLayout", {
 utilLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 utilLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-local rejoinButton = createButton(utilSection, "Vào lại server")
+local rejoinButton = createButton(utilSection, getText("rejoin"))
 rejoinButton.MouseButton1Click:Connect(function()
 	TeleportService:Teleport(game.PlaceId, player)
 end)
 
-local copyPosButton = createButton(utilSection, "Sao chép vị trí")
+local copyPosButton = createButton(utilSection, getText("copy_pos"))
 copyPosButton.MouseButton1Click:Connect(function()
 	local character = player.Character
 	if not character then
@@ -1103,7 +1312,7 @@ copyPosButton.MouseButton1Click:Connect(function()
 end)
 
 -- PVP section (UI only)
-local pvpSection = createSection(pvpPage, "Công cụ PVP")
+local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
 pvpSection.Size = UDim2.new(1, -24, 0, 220)
 local pvpLayout = create("UIGridLayout", {
 	CellSize = UDim2.new(0, 160, 0, 30),
@@ -1118,39 +1327,146 @@ local pvpStatus = create("TextLabel", {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, -24, 0, 20),
 	Font = Enum.Font.Gotham,
-	Text = "Trạng thái: Sẵn sàng",
+	Text = getText("status_idle"),
 	TextSize = 12,
 	TextColor3 = theme.muted,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	Parent = pvpSection,
 })
 
-local aimToggle = createButton(pvpSection, "Tự ngắm: TẮT")
+local aimToggle = createButton(pvpSection, getText("auto_off"))
 
-local locatorToggle = createButton(pvpSection, "Định vị: TẮT")
+local locatorToggle = createButton(pvpSection, getText("locator_off"))
 
-local teamToggle = createButton(pvpSection, "Bỏ qua team: BẬT")
+local teamToggle = createButton(pvpSection, getText("ignore_team_on"))
 
-local wallbangToggle = createButton(pvpSection, "Xuyên tường: TẮT")
+local wallbangToggle = createButton(pvpSection, getText("wallbang_off"))
 
-local infiniteAmmoToggle = createButton(pvpSection, "Đạn vô hạn: TẮT")
+local infiniteAmmoToggle = createButton(pvpSection, getText("infinite_off"))
 
-local fastReloadToggle = createButton(pvpSection, "Nạp nhanh: TẮT")
+local fastReloadToggle = createButton(pvpSection, getText("reload_off"))
 
-local silentAimToggle = createButton(pvpSection, "Hút đầu: TẮT")
+local silentAimToggle = createButton(pvpSection, getText("headmagnet_off"))
 
-local aimPartToggle = createButton(pvpSection, "Vị trí ngắm: Đầu")
+local aimPartToggle = createButton(pvpSection, string.format(getText("aim_part"), getAimPartLabel()))
 
-local hitboxToggle = createButton(pvpSection, "Vùng trúng: TẮT")
+local hitboxToggle = createButton(pvpSection, getText("hitbox_off"))
 
-local pingButton = createButton(pvpSection, "Ping gần nhất")
+local pingButton = createButton(pvpSection, getText("ping"))
+
+-- Settings section
+local settingsSection, settingsSectionTitle = createSection(settingsPage, getText("section_settings"))
+settingsSection.Size = UDim2.new(1, -24, 0, 180)
+local settingsLayout = create("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	FillDirection = Enum.FillDirection.Vertical,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Parent = settingsSection,
+})
+settingsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+settingsLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local saveSettingsButton = createButton(settingsSection, getText("save_settings"))
+local clearSettingsButton = createButton(settingsSection, getText("clear_settings"))
+local languageToggleButton = createButton(settingsSection, getText("language_toggle"))
+
+local settingsStatus = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 20),
+	Font = Enum.Font.Gotham,
+	Text = "",
+	TextSize = 12,
+	TextColor3 = theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	Parent = settingsSection,
+})
+
+local function applyLanguage()
+	keyTitle.Text = getText("key_title")
+	keySubtitle.Text = getText("key_subtitle")
+	keyInput.PlaceholderText = getText("key_placeholder")
+	keyButton.Text = getText("key_unlock")
+	if keyGate.Visible then
+		keyStatus.Text = getText("key_required")
+	end
+
+	title.Text = getText("menu_title")
+	hint.Text = getText("hint")
+
+	tabs[playerTabName].Text = getText("tab_player")
+	tabs[worldTabName].Text = getText("tab_world")
+	tabs[utilityTabName].Text = getText("tab_utility")
+	tabs[pvpTabName].Text = getText("tab_pvp")
+	tabs[settingsTabName].Text = getText("tab_settings")
+
+	playerSectionTitle.Text = getText("section_player")
+	worldSectionTitle.Text = getText("section_world")
+	utilSectionTitle.Text = getText("section_utility")
+	pvpSectionTitle.Text = getText("section_pvp")
+	settingsSectionTitle.Text = getText("section_settings")
+
+	walkSpeedInput.PlaceholderText = getText("walkspeed")
+	jumpPowerInput.PlaceholderText = getText("jumppower")
+	applyPlayerButton.Text = getText("apply")
+	resetButton.Text = getText("reset")
+	timeInput.PlaceholderText = getText("time")
+	applyTimeButton.Text = getText("apply_time")
+	fullbrightButton.Text = getText("fullbright")
+	rejoinButton.Text = getText("rejoin")
+	copyPosButton.Text = getText("copy_pos")
+
+	aimToggle.Text = autoAimEnabled and getText("auto_on") or getText("auto_off")
+	locatorToggle.Text = locatorEnabled and getText("locator_on") or getText("locator_off")
+	teamToggle.Text = ignoreTeamEnabled and getText("ignore_team_on") or getText("ignore_team_off")
+	wallbangToggle.Text = wallbangEnabled and getText("wallbang_on") or getText("wallbang_off")
+	infiniteAmmoToggle.Text = infiniteAmmoEnabled and getText("infinite_on") or getText("infinite_off")
+	fastReloadToggle.Text = fastReloadEnabled and getText("reload_on") or getText("reload_off")
+	silentAimToggle.Text = silentAimEnabled and getText("headmagnet_on") or getText("headmagnet_off")
+	aimPartToggle.Text = string.format(getText("aim_part"), getAimPartLabel())
+	hitboxToggle.Text = hitboxEnabled and getText("hitbox_on") or getText("hitbox_off")
+	pingButton.Text = getText("ping")
+
+	saveSettingsButton.Text = getText("save_settings")
+	clearSettingsButton.Text = getText("clear_settings")
+	languageToggleButton.Text = getText("language_toggle")
+
+	setPvpStatus(currentStatusKey, table.unpack(currentStatusArgs))
+end
+
+local function saveConfig()
+	_G[configKey] = {
+		language = currentLanguage,
+		autoAimEnabled = autoAimEnabled,
+		locatorEnabled = locatorEnabled,
+		ignoreTeamEnabled = ignoreTeamEnabled,
+		wallbangEnabled = wallbangEnabled,
+		infiniteAmmoEnabled = infiniteAmmoEnabled,
+		fastReloadEnabled = fastReloadEnabled,
+		silentAimEnabled = silentAimEnabled,
+		aimPartIndex = aimPartIndex,
+		hitboxEnabled = hitboxEnabled,
+	}
+	settingsStatus.Text = getText("settings_saved")
+end
+
+local function clearConfig()
+	_G[configKey] = nil
+	settingsStatus.Text = getText("settings_cleared")
+end
+
+saveSettingsButton.MouseButton1Click:Connect(saveConfig)
+clearSettingsButton.MouseButton1Click:Connect(clearConfig)
+languageToggleButton.MouseButton1Click:Connect(function()
+	currentLanguage = currentLanguage == "vi" and "en" or "vi"
+	applyLanguage()
+end)
 
 aimToggle.MouseButton1Click:Connect(function()
 	autoAimEnabled = not autoAimEnabled
 	if autoAimEnabled then
-		aimToggle.Text = "Tự ngắm: BẬT"
+		aimToggle.Text = getText("auto_on")
 	else
-		aimToggle.Text = "Tự ngắm: TẮT"
+		aimToggle.Text = getText("auto_off")
 	end
 	setAutoAim(autoAimEnabled, pvpStatus)
 end)
@@ -1158,9 +1474,9 @@ end)
 locatorToggle.MouseButton1Click:Connect(function()
 	locatorEnabled = not locatorEnabled
 	if locatorEnabled then
-		locatorToggle.Text = "Định vị: BẬT"
+		locatorToggle.Text = getText("locator_on")
 	else
-		locatorToggle.Text = "Định vị: TẮT"
+		locatorToggle.Text = getText("locator_off")
 	end
 	setLocatorEnabled(locatorEnabled, pvpStatus)
 end)
@@ -1168,18 +1484,18 @@ end)
 teamToggle.MouseButton1Click:Connect(function()
 	ignoreTeamEnabled = not ignoreTeamEnabled
 	if ignoreTeamEnabled then
-		teamToggle.Text = "Bỏ qua team: BẬT"
+		teamToggle.Text = getText("ignore_team_on")
 	else
-		teamToggle.Text = "Bỏ qua team: TẮT"
+		teamToggle.Text = getText("ignore_team_off")
 	end
 end)
 
 wallbangToggle.MouseButton1Click:Connect(function()
 	wallbangEnabled = not wallbangEnabled
 	if wallbangEnabled then
-		wallbangToggle.Text = "Xuyên tường: BẬT"
+		wallbangToggle.Text = getText("wallbang_on")
 	else
-		wallbangToggle.Text = "Xuyên tường: TẮT"
+		wallbangToggle.Text = getText("wallbang_off")
 	end
 	if autoAimEnabled then
 		setAutoAim(true, pvpStatus)
@@ -1189,9 +1505,9 @@ end)
 infiniteAmmoToggle.MouseButton1Click:Connect(function()
 	infiniteAmmoEnabled = not infiniteAmmoEnabled
 	if infiniteAmmoEnabled then
-		infiniteAmmoToggle.Text = "Đạn vô hạn: BẬT"
+		infiniteAmmoToggle.Text = getText("infinite_on")
 	else
-		infiniteAmmoToggle.Text = "Đạn vô hạn: TẮT"
+		infiniteAmmoToggle.Text = getText("infinite_off")
 	end
 	setAmmoHelpersEnabled()
 end)
@@ -1199,9 +1515,9 @@ end)
 fastReloadToggle.MouseButton1Click:Connect(function()
 	fastReloadEnabled = not fastReloadEnabled
 	if fastReloadEnabled then
-		fastReloadToggle.Text = "Nạp nhanh: BẬT"
+		fastReloadToggle.Text = getText("reload_on")
 	else
-		fastReloadToggle.Text = "Nạp nhanh: TẮT"
+		fastReloadToggle.Text = getText("reload_off")
 	end
 	setAmmoHelpersEnabled()
 end)
@@ -1209,12 +1525,12 @@ end)
 silentAimToggle.MouseButton1Click:Connect(function()
 	silentAimEnabled = not silentAimEnabled
 	if silentAimEnabled then
-		silentAimToggle.Text = "Hút đầu: BẬT"
+		silentAimToggle.Text = getText("headmagnet_on")
 		ensureSilentAimHook()
-		pvpStatus.Text = "Trạng thái: Bật hút đầu"
+		setPvpStatus("status_headmagnet_on")
 	else
-		silentAimToggle.Text = "Hút đầu: TẮT"
-		pvpStatus.Text = "Trạng thái: Tắt hút đầu"
+		silentAimToggle.Text = getText("headmagnet_off")
+		setPvpStatus("status_headmagnet_off")
 	end
 end)
 
@@ -1223,15 +1539,15 @@ aimPartToggle.MouseButton1Click:Connect(function()
 	if aimPartIndex > #aimParts then
 		aimPartIndex = 1
 	end
-	aimPartToggle.Text = "Vị trí ngắm: " .. (aimPartLabels[aimParts[aimPartIndex]] or "Đầu")
+	aimPartToggle.Text = string.format(getText("aim_part"), getAimPartLabel())
 end)
 
 hitboxToggle.MouseButton1Click:Connect(function()
 	hitboxEnabled = not hitboxEnabled
 	if hitboxEnabled then
-		hitboxToggle.Text = "Vùng trúng: BẬT"
+		hitboxToggle.Text = getText("hitbox_on")
 	else
-		hitboxToggle.Text = "Vùng trúng: TẮT"
+		hitboxToggle.Text = getText("hitbox_off")
 	end
 	setHitboxEnabled()
 end)
@@ -1239,17 +1555,21 @@ end)
 pingButton.MouseButton1Click:Connect(function()
 	local target, distanceOrError = getNearestPlayer()
 	if not target then
-		pvpStatus.Text = distanceOrError or "Trạng thái: Không thể định vị."
+		if distanceOrError then
+			pvpStatus.Text = distanceOrError
+		else
+			setPvpStatus("status_locate_fail")
+		end
 		return
 	end
 
 	local head = getHeadPart(target)
 	if not head then
-		pvpStatus.Text = "Trạng thái: Không thể xác định vị trí."
+		setPvpStatus("status_target_fail")
 		return
 	end
 
-	pvpStatus.Text = string.format("Trạng thái: Gần nhất %s (%.0fm)", target.Name, distanceOrError)
+	setPvpStatus("status_nearest", target.Name, distanceOrError)
 	if setclipboard then
 		setclipboard(string.format("CFrame.new(%.2f, %.2f, %.2f)", head.Position.X, head.Position.Y, head.Position.Z))
 	end
@@ -1265,6 +1585,8 @@ local function setVisible(state)
 	end
 end
 
+applySavedConfig()
+
 closeButton.MouseButton1Click:Connect(function()
 	setVisible(false)
 end)
@@ -1276,19 +1598,36 @@ end)
 
 keyButton.MouseButton1Click:Connect(function()
 	if keyInput.Text == accessKey then
-		keyStatus.Text = "Đã xác thực."
+		keyStatus.Text = getText("key_success")
 		keyStatus.TextColor3 = Color3.fromRGB(134, 239, 172)
 		main.Visible = true
 		keyGate.Visible = false
 	else
-		keyStatus.Text = "Sai mã. Thử lại."
+		keyStatus.Text = getText("key_invalid")
 		keyStatus.TextColor3 = Color3.fromRGB(248, 113, 113)
 	end
 end)
 
-if not requireKey then
-	keyGate.Visible = false
-	setVisible(true)
+	if not requireKey then
+		keyGate.Visible = false
+		setVisible(true)
+	end
+
+applyLanguage()
+if autoAimEnabled then
+	setAutoAim(true, pvpStatus)
+end
+if locatorEnabled then
+	setLocatorEnabled(true, pvpStatus)
+end
+if infiniteAmmoEnabled or fastReloadEnabled then
+	setAmmoHelpersEnabled()
+end
+if silentAimEnabled then
+	ensureSilentAimHook()
+end
+if hitboxEnabled then
+	setHitboxEnabled()
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -1348,7 +1687,7 @@ local hint = create("TextLabel", {
 	Size = UDim2.new(1, 0, 0, 22),
 	Position = UDim2.new(0, 0, 1, -22),
 	Font = Enum.Font.Gotham,
-	Text = "Nhấn RightShift để ẩn/hiện menu",
+	Text = getText("hint"),
 	TextSize = 11,
 	TextColor3 = theme.muted,
 	TextXAlignment = Enum.TextXAlignment.Center,
