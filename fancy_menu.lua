@@ -1271,6 +1271,8 @@ applyTimeButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+setPvpStatus("status_idle")
+
 local fullbright = false
 local fullbrightButton = createButton(worldSection, getText("fullbright"))
 fullbrightButton.MouseButton1Click:Connect(function()
