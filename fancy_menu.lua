@@ -980,12 +980,15 @@ create("UICorner", {
 	Parent = minimizeButton,
 })
 
-local tabBar = create("Frame", {
+local tabBar = create("ScrollingFrame", {
 	Name = "TabBar",
 	Size = UDim2.new(0, 160, 1, -48),
 	Position = UDim2.new(0, 0, 0, 48),
 	BackgroundColor3 = theme.panelDark,
 	BorderSizePixel = 0,
+	ScrollBarThickness = 4,
+	ScrollBarImageColor3 = theme.stroke,
+	CanvasSize = UDim2.new(0, 0, 0, 0),
 	Parent = main,
 })
 
@@ -1000,6 +1003,10 @@ local tabList = create("UIListLayout", {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = tabBar,
 })
+
+tabList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	tabBar.CanvasSize = UDim2.new(0, 0, 0, tabList.AbsoluteContentSize.Y + 20)
+end)
 
 create("UIPadding", {
 	PaddingTop = UDim.new(0, 12),
