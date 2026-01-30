@@ -1321,18 +1321,11 @@ end)
 -- PVP section (UI only)
 local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
 pvpSection.Size = UDim2.new(1, -24, 0, 220)
-local pvpLayout = create("UIGridLayout", {
-	CellSize = UDim2.new(0, 160, 0, 30),
-	CellPadding = UDim2.new(0, 6, 0, 6),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-	Parent = pvpSection,
-})
-pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
 local pvpStatus = create("TextLabel", {
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, -24, 0, 20),
+	Position = UDim2.new(0, 12, 0, 32),
 	Font = Enum.Font.Gotham,
 	Text = getText("status_idle"),
 	TextSize = 12,
@@ -1341,25 +1334,42 @@ local pvpStatus = create("TextLabel", {
 	Parent = pvpSection,
 })
 
-local aimToggle = createButton(pvpSection, getText("auto_off"))
+setPvpStatus("status_idle")
 
-local locatorToggle = createButton(pvpSection, getText("locator_off"))
+local pvpBody = Instance.new("Frame")
+pvpBody.BackgroundTransparency = 1
+pvpBody.Position = UDim2.new(0, 12, 0, 58)
+pvpBody.Size = UDim2.new(1, -24, 1, -66)
+pvpBody.Parent = pvpSection
 
-local teamToggle = createButton(pvpSection, getText("ignore_team_on"))
+local pvpLayout = create("UIGridLayout", {
+	CellSize = UDim2.new(0, 160, 0, 30),
+	CellPadding = UDim2.new(0, 6, 0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Parent = pvpBody,
+})
+pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 
-local wallbangToggle = createButton(pvpSection, getText("wallbang_off"))
+local aimToggle = createButton(pvpBody, getText("auto_off"))
 
-local infiniteAmmoToggle = createButton(pvpSection, getText("infinite_off"))
+local locatorToggle = createButton(pvpBody, getText("locator_off"))
 
-local fastReloadToggle = createButton(pvpSection, getText("reload_off"))
+local teamToggle = createButton(pvpBody, getText("ignore_team_on"))
 
-local silentAimToggle = createButton(pvpSection, getText("headmagnet_off"))
+local wallbangToggle = createButton(pvpBody, getText("wallbang_off"))
 
-local aimPartToggle = createButton(pvpSection, string.format(getText("aim_part"), getAimPartLabel()))
+local infiniteAmmoToggle = createButton(pvpBody, getText("infinite_off"))
 
-local hitboxToggle = createButton(pvpSection, getText("hitbox_off"))
+local fastReloadToggle = createButton(pvpBody, getText("reload_off"))
 
-local pingButton = createButton(pvpSection, getText("ping"))
+local silentAimToggle = createButton(pvpBody, getText("headmagnet_off"))
+
+local aimPartToggle = createButton(pvpBody, string.format(getText("aim_part"), getAimPartLabel()))
+
+local hitboxToggle = createButton(pvpBody, getText("hitbox_off"))
+
+local pingButton = createButton(pvpBody, getText("ping"))
 
 -- Settings section
 local settingsSection, settingsSectionTitle = createSection(settingsPage, getText("section_settings"))
