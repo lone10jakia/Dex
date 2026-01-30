@@ -493,11 +493,6 @@ local function setAutoAim(enabled, statusLabel)
 			return
 		end
 
-		local root = getRoot()
-		if not root then
-			return
-		end
-
 		local target, distanceOrError = getNearestPlayer()
 		if not target then
 			if statusLabel then
@@ -1320,7 +1315,7 @@ end)
 
 -- PVP section (UI only)
 local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
-pvpSection.Size = UDim2.new(1, -24, 0, 220)
+pvpSection.Size = UDim2.new(1, -24, 0, 250)
 
 local pvpStatus = create("TextLabel", {
 	BackgroundTransparency = 1,
@@ -1336,20 +1331,28 @@ local pvpStatus = create("TextLabel", {
 
 setPvpStatus("status_idle")
 
-local pvpBody = Instance.new("Frame")
+local pvpBody = Instance.new("ScrollingFrame")
 pvpBody.BackgroundTransparency = 1
+pvpBody.BorderSizePixel = 0
+pvpBody.ScrollBarThickness = 4
+pvpBody.ScrollBarImageColor3 = theme.stroke
 pvpBody.Position = UDim2.new(0, 12, 0, 58)
 pvpBody.Size = UDim2.new(1, -24, 1, -66)
+pvpBody.CanvasSize = UDim2.new(0, 0, 0, 0)
 pvpBody.Parent = pvpSection
 
 local pvpLayout = create("UIGridLayout", {
-	CellSize = UDim2.new(0, 160, 0, 30),
+	CellSize = UDim2.new(0, 150, 0, 30),
 	CellPadding = UDim2.new(0, 6, 0, 6),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = pvpBody,
 })
 pvpLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 pvpLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+pvpLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	pvpBody.CanvasSize = UDim2.new(0, 0, 0, pvpLayout.AbsoluteContentSize.Y + 6)
+end)
 
 local aimToggle = createButton(pvpBody, getText("auto_off"))
 
