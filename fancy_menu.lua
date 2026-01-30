@@ -27,6 +27,8 @@ local theme = {
 
 local autoAimEnabled = false
 local autoAimConnection
+local storedCameraType
+local storedCameraSubject
 local locatorEnabled = false
 local locatorConnection
 local locatorBillboards = {}
@@ -473,10 +475,28 @@ local function setAutoAim(enabled, statusLabel)
 	end
 
 	if not enabled then
+		local camera = workspace.CurrentCamera
+		if camera and storedCameraType then
+			camera.CameraType = storedCameraType
+			if storedCameraSubject then
+				camera.CameraSubject = storedCameraSubject
+			end
+		end
+		storedCameraType = nil
+		storedCameraSubject = nil
 		if statusLabel then
 			setStatusLabel(statusLabel, "status_auto_off")
 		end
 		return
+	end
+
+	do
+		local camera = workspace.CurrentCamera
+		if camera then
+			storedCameraType = camera.CameraType
+			storedCameraSubject = camera.CameraSubject
+			camera.CameraType = Enum.CameraType.Scriptable
+		end
 	end
 
 	if statusLabel then
