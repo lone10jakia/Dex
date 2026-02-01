@@ -51,11 +51,15 @@ local npcFlyMode = "off"
 local npcOrbitAngle = 0
 local npcOrbitRadius = 6
 local npcOrbitSpeed = 1.5
-local npcOrbitSpeedStep = 0.5
 local npcOrbitHeight = 0
-local npcOrbitHeightStep = 2
 local npcHoverOffset = 6
-local npcHoverOffsetStep = 2
+local npcTuneSpeedStep = 0.5
+local npcTuneHeightStep = 2
+local npcTuneDistanceStep = 2
+local autoAttackEnabled = false
+local autoAttackConnection
+local autoBandageEnabled = false
+local autoBandageConnection
 local antiKickEnabled = false
 local antiKickHooked = false
 local antiKickOriginalNamecall
@@ -139,12 +143,16 @@ local languageStrings = {
 		npc_orbit_off = "Bay vòng quanh: TẮT",
 		npc_hover_on = "Bay trên đầu: BẬT",
 		npc_hover_off = "Bay trên đầu: TẮT",
-		npc_orbit_speed_up = "Tăng tốc bay vòng",
-		npc_orbit_speed_down = "Giảm tốc bay vòng",
-		npc_orbit_height_up = "Tăng cao bay vòng",
-		npc_orbit_height_down = "Giảm cao bay vòng",
-		npc_hover_height_up = "Tăng cao bay trên đầu",
-		npc_hover_height_down = "Giảm cao bay trên đầu",
+		npc_tune_speed_up = "Tăng tốc bay",
+		npc_tune_speed_down = "Giảm tốc bay",
+		npc_tune_height_up = "Tăng độ cao",
+		npc_tune_height_down = "Giảm độ cao",
+		npc_tune_distance_up = "Tăng khoảng cách",
+		npc_tune_distance_down = "Giảm khoảng cách",
+		auto_attack_on = "Tự đánh khi cầm vũ khí: BẬT",
+		auto_attack_off = "Tự đánh khi cầm vũ khí: TẮT",
+		auto_bandage_on = "Auto dùng băng gạc: BẬT",
+		auto_bandage_off = "Auto dùng băng gạc: TẮT",
 		antikick_on = "Anti-kick khi tele: BẬT",
 		antikick_off = "Anti-kick khi tele: TẮT",
 		collect_nearby = "Nhặt xung quanh",
@@ -228,12 +236,16 @@ local languageStrings = {
 		npc_orbit_off = "Orbit NPC: OFF",
 		npc_hover_on = "Hover above NPC: ON",
 		npc_hover_off = "Hover above NPC: OFF",
-		npc_orbit_speed_up = "Increase orbit speed",
-		npc_orbit_speed_down = "Decrease orbit speed",
-		npc_orbit_height_up = "Raise orbit height",
-		npc_orbit_height_down = "Lower orbit height",
-		npc_hover_height_up = "Raise hover height",
-		npc_hover_height_down = "Lower hover height",
+		npc_tune_speed_up = "Increase speed",
+		npc_tune_speed_down = "Decrease speed",
+		npc_tune_height_up = "Raise height",
+		npc_tune_height_down = "Lower height",
+		npc_tune_distance_up = "Increase distance",
+		npc_tune_distance_down = "Decrease distance",
+		auto_attack_on = "Auto attack on equip: ON",
+		auto_attack_off = "Auto attack on equip: OFF",
+		auto_bandage_on = "Auto use bandage: ON",
+		auto_bandage_off = "Auto use bandage: OFF",
 		antikick_on = "Anti-kick on teleport: ON",
 		antikick_off = "Anti-kick on teleport: OFF",
 		collect_nearby = "Collect nearby",
@@ -332,8 +344,8 @@ local function setNpcFlyMode(mode)
 			npcFlyAutoRotate = humanoid.AutoRotate
 			humanoid.AutoRotate = false
 		end
-		if npcFlyMode == "under" then
-			root.CFrame = getNpcUndergroundCFrame(npcRoot)
+			if npcFlyMode == "under" then
+				root.CFrame = getNpcUndergroundCFrame(npcRoot)
 			elseif npcFlyMode == "orbit" then
 				npcOrbitAngle = (npcOrbitAngle + npcOrbitSpeed * delta) % (math.pi * 2)
 				local offset = Vector3.new(math.cos(npcOrbitAngle) * npcOrbitRadius, npcOrbitHeight, math.sin(npcOrbitAngle) * npcOrbitRadius)
@@ -368,6 +380,78 @@ local function updateAntiKick(enable)
 	end)
 end
 
+local function updateAutoAttack(enable)
+	autoAttackEnabled = enable
+	if autoAttackConnection then
+		autoAttackConnection:Disconnect()
+		autoAttackConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoAttackConnection = RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		if not character then
+			return
+		end
+		local tool = character:FindFirstChildOfClass("Tool")
+		if tool then
+			pcall(function()
+				tool:Activate()
+			end)
+		end
+	end)
+end
+
+local function findBandageTool()
+	local character = player.Character
+	local backpack = player:FindFirstChild("Backpack")
+	local function findIn(container)
+		if not container then
+			return nil
+		end
+		for _, tool in ipairs(container:GetChildren()) do
+			if tool:IsA("Tool") and string.find(tool.Name:lower(), "bandage") then
+				return tool
+			end
+		end
+		return nil
+	end
+	return findIn(character) or findIn(backpack)
+end
+
+local function updateAutoBandage(enable)
+	autoBandageEnabled = enable
+	if autoBandageConnection then
+		autoBandageConnection:Disconnect()
+		autoBandageConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoBandageConnection = RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		if not character then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if not humanoid or humanoid.Health <= 0 then
+			return
+		end
+		if humanoid.Health <= autoHealThreshold then
+			local bandage = findBandageTool()
+			if bandage then
+				if bandage.Parent ~= character then
+					bandage.Parent = character
+				end
+				pcall(function()
+					bandage:Activate()
+				end)
+			end
+		end
+	end)
+end
+
 local function collectNearbyItems()
 	local character = player.Character
 	if not character then
@@ -390,6 +474,17 @@ local function collectNearbyItems()
 				if (item.Position - root.Position).Magnitude <= radius then
 					toolParent.Parent = player.Backpack
 				end
+			end
+		end
+	end
+
+	local cashFolder = workspace:FindFirstChild("CityNPCs")
+	cashFolder = cashFolder and cashFolder:FindFirstChild("Drop")
+	cashFolder = cashFolder and cashFolder:FindFirstChild("Cash")
+	if cashFolder then
+		for _, cashItem in ipairs(cashFolder:GetDescendants()) do
+			if cashItem:IsA("BasePart") and (cashItem.Position - root.Position).Magnitude <= radius then
+				cashItem.CFrame = root.CFrame
 			end
 		end
 	end
@@ -1567,13 +1662,15 @@ local npcTeleportButton = createButton(utilScroll, getText("npc_tele"))
 local npcFlyUpButton = createButton(utilScroll, getText("npc_fly_up"))
 local npcFlyDownButton = createButton(utilScroll, getText("npc_fly_down"))
 local npcOrbitToggle = createButton(utilScroll, getText("npc_orbit_off"))
-local npcOrbitSpeedUpButton = createButton(utilScroll, getText("npc_orbit_speed_up"))
-local npcOrbitSpeedDownButton = createButton(utilScroll, getText("npc_orbit_speed_down"))
-local npcOrbitHeightUpButton = createButton(utilScroll, getText("npc_orbit_height_up"))
-local npcOrbitHeightDownButton = createButton(utilScroll, getText("npc_orbit_height_down"))
 local npcHoverToggle = createButton(utilScroll, getText("npc_hover_off"))
-local npcHoverHeightUpButton = createButton(utilScroll, getText("npc_hover_height_up"))
-local npcHoverHeightDownButton = createButton(utilScroll, getText("npc_hover_height_down"))
+local npcTuneSpeedUpButton = createButton(utilScroll, getText("npc_tune_speed_up"))
+local npcTuneSpeedDownButton = createButton(utilScroll, getText("npc_tune_speed_down"))
+local npcTuneHeightUpButton = createButton(utilScroll, getText("npc_tune_height_up"))
+local npcTuneHeightDownButton = createButton(utilScroll, getText("npc_tune_height_down"))
+local npcTuneDistanceUpButton = createButton(utilScroll, getText("npc_tune_distance_up"))
+local npcTuneDistanceDownButton = createButton(utilScroll, getText("npc_tune_distance_down"))
+local autoAttackToggle = createButton(utilScroll, getText("auto_attack_off"))
+local autoBandageToggle = createButton(utilScroll, getText("auto_bandage_off"))
 local antiKickToggle = createButton(utilScroll, getText("antikick_off"))
 local collectNearbyButton = createButton(utilScroll, getText("collect_nearby"))
 local autoHealToggle = createButton(utilScroll, getText("auto_heal_off"))
@@ -1625,22 +1722,6 @@ npcOrbitToggle.MouseButton1Click:Connect(function()
 	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
 end)
 
-npcOrbitSpeedUpButton.MouseButton1Click:Connect(function()
-	npcOrbitSpeed = math.min(npcOrbitSpeed + npcOrbitSpeedStep, 6)
-end)
-
-npcOrbitSpeedDownButton.MouseButton1Click:Connect(function()
-	npcOrbitSpeed = math.max(npcOrbitSpeed - npcOrbitSpeedStep, 0.2)
-end)
-
-npcOrbitHeightUpButton.MouseButton1Click:Connect(function()
-	npcOrbitHeight = math.min(npcOrbitHeight + npcOrbitHeightStep, 50)
-end)
-
-npcOrbitHeightDownButton.MouseButton1Click:Connect(function()
-	npcOrbitHeight = math.max(npcOrbitHeight - npcOrbitHeightStep, -50)
-end)
-
 npcHoverToggle.MouseButton1Click:Connect(function()
 	if npcFlyMode == "above" then
 		setNpcFlyMode("off")
@@ -1652,12 +1733,50 @@ npcHoverToggle.MouseButton1Click:Connect(function()
 	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
 end)
 
-npcHoverHeightUpButton.MouseButton1Click:Connect(function()
-	npcHoverOffset = math.min(npcHoverOffset + npcHoverOffsetStep, 50)
+npcTuneSpeedUpButton.MouseButton1Click:Connect(function()
+	npcOrbitSpeed = math.min(npcOrbitSpeed + npcTuneSpeedStep, 6)
 end)
 
-npcHoverHeightDownButton.MouseButton1Click:Connect(function()
-	npcHoverOffset = math.max(npcHoverOffset - npcHoverOffsetStep, 2)
+npcTuneSpeedDownButton.MouseButton1Click:Connect(function()
+	npcOrbitSpeed = math.max(npcOrbitSpeed - npcTuneSpeedStep, 0.2)
+end)
+
+npcTuneHeightUpButton.MouseButton1Click:Connect(function()
+	if npcFlyMode == "orbit" then
+		npcOrbitHeight = math.min(npcOrbitHeight + npcTuneHeightStep, 50)
+	elseif npcFlyMode == "above" then
+		npcHoverOffset = math.min(npcHoverOffset + npcTuneHeightStep, 50)
+	else
+		npcFlyOffset = math.min(npcFlyOffset + npcTuneHeightStep, 50)
+	end
+end)
+
+npcTuneHeightDownButton.MouseButton1Click:Connect(function()
+	if npcFlyMode == "orbit" then
+		npcOrbitHeight = math.max(npcOrbitHeight - npcTuneHeightStep, -50)
+	elseif npcFlyMode == "above" then
+		npcHoverOffset = math.max(npcHoverOffset - npcTuneHeightStep, 2)
+	else
+		npcFlyOffset = math.max(npcFlyOffset - npcTuneHeightStep, -200)
+	end
+end)
+
+npcTuneDistanceUpButton.MouseButton1Click:Connect(function()
+	npcOrbitRadius = math.min(npcOrbitRadius + npcTuneDistanceStep, 30)
+end)
+
+npcTuneDistanceDownButton.MouseButton1Click:Connect(function()
+	npcOrbitRadius = math.max(npcOrbitRadius - npcTuneDistanceStep, 2)
+end)
+
+autoAttackToggle.MouseButton1Click:Connect(function()
+	updateAutoAttack(not autoAttackEnabled)
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+end)
+
+autoBandageToggle.MouseButton1Click:Connect(function()
+	updateAutoBandage(not autoBandageEnabled)
+	autoBandageToggle.Text = autoBandageEnabled and getText("auto_bandage_on") or getText("auto_bandage_off")
 end)
 
 antiKickToggle.MouseButton1Click:Connect(function()
@@ -1808,13 +1927,15 @@ local function applyLanguage()
 	npcFlyUpButton.Text = getText("npc_fly_up")
 	npcFlyDownButton.Text = getText("npc_fly_down")
 	npcOrbitToggle.Text = npcFlyMode == "orbit" and getText("npc_orbit_on") or getText("npc_orbit_off")
-	npcOrbitSpeedUpButton.Text = getText("npc_orbit_speed_up")
-	npcOrbitSpeedDownButton.Text = getText("npc_orbit_speed_down")
-	npcOrbitHeightUpButton.Text = getText("npc_orbit_height_up")
-	npcOrbitHeightDownButton.Text = getText("npc_orbit_height_down")
 	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
-	npcHoverHeightUpButton.Text = getText("npc_hover_height_up")
-	npcHoverHeightDownButton.Text = getText("npc_hover_height_down")
+	npcTuneSpeedUpButton.Text = getText("npc_tune_speed_up")
+	npcTuneSpeedDownButton.Text = getText("npc_tune_speed_down")
+	npcTuneHeightUpButton.Text = getText("npc_tune_height_up")
+	npcTuneHeightDownButton.Text = getText("npc_tune_height_down")
+	npcTuneDistanceUpButton.Text = getText("npc_tune_distance_up")
+	npcTuneDistanceDownButton.Text = getText("npc_tune_distance_down")
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+	autoBandageToggle.Text = autoBandageEnabled and getText("auto_bandage_on") or getText("auto_bandage_off")
 	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
 	collectNearbyButton.Text = getText("collect_nearby")
 	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
