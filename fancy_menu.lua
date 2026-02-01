@@ -44,6 +44,7 @@ local silentAimHooked = false
 local originalNamecall
 local npcFlyEnabled = false
 local npcFlyConnection
+local npcFlyAutoRotate
 local autoAttackEnabled = false
 local autoAttackConnection
 local antiKickEnabled = false
@@ -245,11 +246,24 @@ local function getNpcRoot()
 	return npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
 end
 
+local function getNpcUndergroundCFrame(npcRoot)
+	local targetPosition = npcRoot.Position + Vector3.new(0, -10, 0)
+	return CFrame.new(targetPosition, targetPosition + Vector3.new(0, 1, 0))
+end
+
 local function updateNpcFly(enable)
 	npcFlyEnabled = enable
 	if npcFlyConnection then
 		npcFlyConnection:Disconnect()
 		npcFlyConnection = nil
+	end
+	if not enable and npcFlyAutoRotate ~= nil then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = npcFlyAutoRotate
+		end
+		npcFlyAutoRotate = nil
 	end
 	if not enable then
 		return
@@ -265,7 +279,12 @@ local function updateNpcFly(enable)
 		end
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if root then
-			root.CFrame = npcRoot.CFrame * CFrame.new(0, -3, 0)
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid and npcFlyAutoRotate == nil then
+				npcFlyAutoRotate = humanoid.AutoRotate
+				humanoid.AutoRotate = false
+			end
+			root.CFrame = getNpcUndergroundCFrame(npcRoot)
 		end
 	end)
 end
@@ -1410,9 +1429,10 @@ end)
 
 -- Tiện ích section
 local utilSection, utilSectionTitle = createSection(utilityPage, getText("section_utility"))
+utilSection.Size = UDim2.new(1, -24, 0, 260)
 local utilLayout = create("UIListLayout", {
 	Padding = UDim.new(0, 8),
-	FillDirection = Enum.FillDirection.Horizontal,
+	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = utilSection,
 })
@@ -1458,7 +1478,7 @@ npcTeleportButton.MouseButton1Click:Connect(function()
 	end
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root then
-		root.CFrame = npcRoot.CFrame * CFrame.new(0, -3, 0)
+		root.CFrame = getNpcUndergroundCFrame(npcRoot)
 	end
 end)
 
