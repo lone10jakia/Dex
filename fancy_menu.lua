@@ -42,6 +42,26 @@ local minimized = false
 local silentAimEnabled = false
 local silentAimHooked = false
 local originalNamecall
+local npcFlyEnabled = false
+local npcFlyConnection
+local npcFlyAutoRotate
+local npcFlyOffset = -10
+local npcFlyOffsetStep = 3
+local npcFlyMode = "off"
+local npcOrbitAngle = 0
+local npcOrbitRadius = 6
+local npcOrbitSpeed = 1.5
+local npcHoverOffset = 6
+local autoAttackEnabled = false
+local autoAttackConnection
+local antiKickEnabled = false
+local antiKickHooked = false
+local antiKickOriginalNamecall
+local autoHealEnabled = false
+local autoHealConnection
+local autoHealTargetCFrame
+local autoHealThreshold = 25
+local autoHealCooldown = 0
 local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
 local aimPartLabels = {
 	vi = {
@@ -108,6 +128,23 @@ local languageStrings = {
 		fullbright = "Bật/Tắt sáng",
 		rejoin = "Vào lại server",
 		copy_pos = "Sao chép vị trí",
+		npc_fly_on = "Bay dưới chân NPC: BẬT",
+		npc_fly_off = "Bay dưới chân NPC: TẮT",
+		npc_tele = "Tele dưới chân NPC",
+		npc_fly_up = "Bay cao hơn",
+		npc_fly_down = "Bay thấp hơn",
+		npc_orbit_on = "Bay vòng quanh: BẬT",
+		npc_orbit_off = "Bay vòng quanh: TẮT",
+		npc_hover_on = "Bay trên đầu: BẬT",
+		npc_hover_off = "Bay trên đầu: TẮT",
+		auto_attack_on = "Tự đánh khi cầm vũ khí: BẬT",
+		auto_attack_off = "Tự đánh khi cầm vũ khí: TẮT",
+		antikick_on = "Anti-kick khi tele: BẬT",
+		antikick_off = "Anti-kick khi tele: TẮT",
+		collect_nearby = "Nhặt xung quanh",
+		auto_heal_on = "Tự hồi máu 25%: BẬT",
+		auto_heal_off = "Tự hồi máu 25%: TẮT",
+		set_heal_spot = "Lưu vị trí hồi máu",
 		auto_on = "Tự ngắm: BẬT",
 		auto_off = "Tự ngắm: TẮT",
 		locator_on = "Định vị: BẬT",
@@ -176,6 +213,23 @@ local languageStrings = {
 		fullbright = "Toggle Fullbright",
 		rejoin = "Rejoin Server",
 		copy_pos = "Copy Position",
+		npc_fly_on = "Fly under NPC: ON",
+		npc_fly_off = "Fly under NPC: OFF",
+		npc_tele = "Teleport under NPC",
+		npc_fly_up = "Fly higher",
+		npc_fly_down = "Fly lower",
+		npc_orbit_on = "Orbit NPC: ON",
+		npc_orbit_off = "Orbit NPC: OFF",
+		npc_hover_on = "Hover above NPC: ON",
+		npc_hover_off = "Hover above NPC: OFF",
+		auto_attack_on = "Auto attack on equip: ON",
+		auto_attack_off = "Auto attack on equip: OFF",
+		antikick_on = "Anti-kick on teleport: ON",
+		antikick_off = "Anti-kick on teleport: OFF",
+		collect_nearby = "Collect nearby",
+		auto_heal_on = "Auto heal at 25%: ON",
+		auto_heal_off = "Auto heal at 25%: OFF",
+		set_heal_spot = "Save heal spot",
 		auto_on = "Auto aim: ON",
 		auto_off = "Auto aim: OFF",
 		locator_on = "Locator: ON",
@@ -209,6 +263,179 @@ end
 local function getText(key)
 	local lang = languageStrings[currentLanguage] or languageStrings.vi
 	return lang[key] or key
+end
+
+local function getNpcRoot()
+	local cityFolder = workspace:FindFirstChild("CityNPCs")
+	local npcFolder = cityFolder and cityFolder:FindFirstChild("NPCs")
+	if not npcFolder then
+		return nil
+	end
+	local npc = npcFolder:GetChildren()[2]
+	if not npc then
+		return nil
+	end
+	return npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+end
+
+local function getNpcUndergroundCFrame(npcRoot)
+	local targetPosition = npcRoot.Position + Vector3.new(0, npcFlyOffset, 0)
+	return CFrame.new(targetPosition, targetPosition + Vector3.new(0, 1, 0))
+end
+
+local function setNpcFlyMode(mode)
+	if npcFlyConnection then
+		npcFlyConnection:Disconnect()
+		npcFlyConnection = nil
+	end
+	if npcFlyAutoRotate ~= nil then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.AutoRotate = npcFlyAutoRotate
+		end
+		npcFlyAutoRotate = nil
+	end
+
+	npcFlyMode = mode or "off"
+	npcFlyEnabled = npcFlyMode == "under"
+
+	if npcFlyMode == "off" then
+		return
+	end
+
+	npcFlyConnection = RunService.Heartbeat:Connect(function(delta)
+		local npcRoot = getNpcRoot()
+		if not npcRoot then
+			return
+		end
+		local character = player.Character
+		if not character then
+			return
+		end
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid and npcFlyAutoRotate == nil then
+			npcFlyAutoRotate = humanoid.AutoRotate
+			humanoid.AutoRotate = false
+		end
+		if npcFlyMode == "under" then
+			root.CFrame = getNpcUndergroundCFrame(npcRoot)
+		elseif npcFlyMode == "orbit" then
+			npcOrbitAngle = (npcOrbitAngle + npcOrbitSpeed * delta) % (math.pi * 2)
+			local offset = Vector3.new(math.cos(npcOrbitAngle) * npcOrbitRadius, 0, math.sin(npcOrbitAngle) * npcOrbitRadius)
+			local targetPosition = npcRoot.Position + offset
+			root.CFrame = CFrame.new(targetPosition, npcRoot.Position)
+		elseif npcFlyMode == "above" then
+			local targetPosition = npcRoot.Position + Vector3.new(0, npcHoverOffset, 0)
+			root.CFrame = CFrame.new(targetPosition, npcRoot.Position)
+		end
+	end)
+end
+
+local function updateNpcFly(enable)
+	setNpcFlyMode(enable and "under" or "off")
+end
+
+local function updateAutoAttack(enable)
+	autoAttackEnabled = enable
+	if autoAttackConnection then
+		autoAttackConnection:Disconnect()
+		autoAttackConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoAttackConnection = RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		if not character then
+			return
+		end
+		local tool = character:FindFirstChildOfClass("Tool")
+		if tool then
+			pcall(function()
+				tool:Activate()
+			end)
+		end
+	end)
+end
+
+local function updateAntiKick(enable)
+	antiKickEnabled = enable
+	if antiKickHooked then
+		return
+	end
+	if not enable or not hookmetamethod then
+		return
+	end
+	antiKickHooked = true
+	antiKickOriginalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		if antiKickEnabled and method == "Kick" then
+			return
+		end
+		return antiKickOriginalNamecall(self, ...)
+	end)
+end
+
+local function collectNearbyItems()
+	local character = player.Character
+	if not character then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local radius = 20
+	for _, item in ipairs(workspace:GetDescendants()) do
+		if item:IsA("Tool") and item.Parent ~= character then
+			local handle = item:FindFirstChild("Handle")
+			if handle and (handle.Position - root.Position).Magnitude <= radius then
+				item.Parent = player.Backpack
+			end
+		elseif item:IsA("BasePart") then
+			local toolParent = item.Parent
+			if toolParent and toolParent:IsA("Tool") and toolParent.Parent ~= character then
+				if (item.Position - root.Position).Magnitude <= radius then
+					toolParent.Parent = player.Backpack
+				end
+			end
+		end
+	end
+end
+
+local function updateAutoHeal(enable)
+	autoHealEnabled = enable
+	if autoHealConnection then
+		autoHealConnection:Disconnect()
+		autoHealConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoHealConnection = RunService.Heartbeat:Connect(function(delta)
+		if not autoHealTargetCFrame then
+			return
+		end
+		if autoHealCooldown > 0 then
+			autoHealCooldown = math.max(0, autoHealCooldown - delta)
+			return
+		end
+		local character = player.Character
+		if not character then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if humanoid and root and humanoid.Health > 0 and humanoid.Health <= autoHealThreshold then
+			root.CFrame = autoHealTargetCFrame
+			autoHealCooldown = 2
+		end
+	end)
 end
 
 local function getAimPartLabel()
@@ -795,7 +1022,7 @@ local screenGui = create("ScreenGui", {
 screenGui.Parent = playerGui
 
 local accessKey = "MEMAYBEO-HUB-2024"
-local requireKey = true
+local requireKey = false
 local animeImageId = "rbxassetid://11924456731"
 
 local keyGate = create("Frame", {
@@ -1310,9 +1537,10 @@ end)
 
 -- Tiện ích section
 local utilSection, utilSectionTitle = createSection(utilityPage, getText("section_utility"))
+utilSection.Size = UDim2.new(1, -24, 0, 460)
 local utilLayout = create("UIListLayout", {
 	Padding = UDim.new(0, 8),
-	FillDirection = Enum.FillDirection.Horizontal,
+	FillDirection = Enum.FillDirection.Vertical,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	Parent = utilSection,
 })
@@ -1333,6 +1561,102 @@ copyPosButton.MouseButton1Click:Connect(function()
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root and setclipboard then
 		setclipboard(string.format("Vector3.new(%.2f, %.2f, %.2f)", root.Position.X, root.Position.Y, root.Position.Z))
+	end
+end)
+
+local npcFlyToggle = createButton(utilSection, getText("npc_fly_off"))
+local npcTeleportButton = createButton(utilSection, getText("npc_tele"))
+local npcFlyUpButton = createButton(utilSection, getText("npc_fly_up"))
+local npcFlyDownButton = createButton(utilSection, getText("npc_fly_down"))
+local npcOrbitToggle = createButton(utilSection, getText("npc_orbit_off"))
+local npcHoverToggle = createButton(utilSection, getText("npc_hover_off"))
+local autoAttackToggle = createButton(utilSection, getText("auto_attack_off"))
+local antiKickToggle = createButton(utilSection, getText("antikick_off"))
+local collectNearbyButton = createButton(utilSection, getText("collect_nearby"))
+local autoHealToggle = createButton(utilSection, getText("auto_heal_off"))
+local setHealSpotButton = createButton(utilSection, getText("set_heal_spot"))
+
+npcFlyToggle.MouseButton1Click:Connect(function()
+	if npcFlyMode == "under" then
+		setNpcFlyMode("off")
+	else
+		setNpcFlyMode("under")
+	end
+	npcFlyToggle.Text = npcFlyMode == "under" and getText("npc_fly_on") or getText("npc_fly_off")
+	npcOrbitToggle.Text = npcFlyMode == "orbit" and getText("npc_orbit_on") or getText("npc_orbit_off")
+	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
+end)
+
+npcTeleportButton.MouseButton1Click:Connect(function()
+	updateAntiKick(antiKickEnabled)
+	local npcRoot = getNpcRoot()
+	if not npcRoot then
+		return
+	end
+	local character = player.Character
+	if not character then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.CFrame = getNpcUndergroundCFrame(npcRoot)
+	end
+end)
+
+npcFlyUpButton.MouseButton1Click:Connect(function()
+	npcFlyOffset = math.min(npcFlyOffset + npcFlyOffsetStep, 50)
+end)
+
+npcFlyDownButton.MouseButton1Click:Connect(function()
+	npcFlyOffset = math.max(npcFlyOffset - npcFlyOffsetStep, -200)
+end)
+
+npcOrbitToggle.MouseButton1Click:Connect(function()
+	if npcFlyMode == "orbit" then
+		setNpcFlyMode("off")
+	else
+		setNpcFlyMode("orbit")
+	end
+	npcFlyToggle.Text = npcFlyMode == "under" and getText("npc_fly_on") or getText("npc_fly_off")
+	npcOrbitToggle.Text = npcFlyMode == "orbit" and getText("npc_orbit_on") or getText("npc_orbit_off")
+	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
+end)
+
+npcHoverToggle.MouseButton1Click:Connect(function()
+	if npcFlyMode == "above" then
+		setNpcFlyMode("off")
+	else
+		setNpcFlyMode("above")
+	end
+	npcFlyToggle.Text = npcFlyMode == "under" and getText("npc_fly_on") or getText("npc_fly_off")
+	npcOrbitToggle.Text = npcFlyMode == "orbit" and getText("npc_orbit_on") or getText("npc_orbit_off")
+	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
+end)
+
+autoAttackToggle.MouseButton1Click:Connect(function()
+	updateAutoAttack(not autoAttackEnabled)
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+end)
+
+antiKickToggle.MouseButton1Click:Connect(function()
+	updateAntiKick(not antiKickEnabled)
+	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
+end)
+
+collectNearbyButton.MouseButton1Click:Connect(function()
+	collectNearbyItems()
+end)
+
+autoHealToggle.MouseButton1Click:Connect(function()
+	updateAutoHeal(not autoHealEnabled)
+	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
+end)
+
+setHealSpotButton.MouseButton1Click:Connect(function()
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then
+		autoHealTargetCFrame = root.CFrame
 	end
 end)
 
@@ -1457,6 +1781,17 @@ local function applyLanguage()
 	fullbrightButton.Text = getText("fullbright")
 	rejoinButton.Text = getText("rejoin")
 	copyPosButton.Text = getText("copy_pos")
+	npcFlyToggle.Text = npcFlyMode == "under" and getText("npc_fly_on") or getText("npc_fly_off")
+	npcTeleportButton.Text = getText("npc_tele")
+	npcFlyUpButton.Text = getText("npc_fly_up")
+	npcFlyDownButton.Text = getText("npc_fly_down")
+	npcOrbitToggle.Text = npcFlyMode == "orbit" and getText("npc_orbit_on") or getText("npc_orbit_off")
+	npcHoverToggle.Text = npcFlyMode == "above" and getText("npc_hover_on") or getText("npc_hover_off")
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
+	collectNearbyButton.Text = getText("collect_nearby")
+	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
+	setHealSpotButton.Text = getText("set_heal_spot")
 
 	aimToggle.Text = autoAimEnabled and getText("auto_on") or getText("auto_off")
 	locatorToggle.Text = locatorEnabled and getText("locator_on") or getText("locator_off")
@@ -1651,10 +1986,10 @@ keyButton.MouseButton1Click:Connect(function()
 	end
 end)
 
-	if not requireKey then
-		keyGate.Visible = false
-		setVisible(true)
-	end
+if not requireKey then
+	keyGate.Visible = false
+	setVisible(true)
+end
 
 applyLanguage()
 if autoAimEnabled then
