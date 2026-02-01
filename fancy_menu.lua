@@ -42,6 +42,13 @@ local minimized = false
 local silentAimEnabled = false
 local silentAimHooked = false
 local originalNamecall
+local npcFlyEnabled = false
+local npcFlyConnection
+local autoAttackEnabled = false
+local autoAttackConnection
+local antiKickEnabled = false
+local antiKickHooked = false
+local antiKickOriginalNamecall
 local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
 local aimPartLabels = {
 	vi = {
@@ -108,6 +115,13 @@ local languageStrings = {
 		fullbright = "Bật/Tắt sáng",
 		rejoin = "Vào lại server",
 		copy_pos = "Sao chép vị trí",
+		npc_fly_on = "Bay dưới chân NPC: BẬT",
+		npc_fly_off = "Bay dưới chân NPC: TẮT",
+		npc_tele = "Tele dưới chân NPC",
+		auto_attack_on = "Tự đánh khi cầm vũ khí: BẬT",
+		auto_attack_off = "Tự đánh khi cầm vũ khí: TẮT",
+		antikick_on = "Anti-kick khi tele: BẬT",
+		antikick_off = "Anti-kick khi tele: TẮT",
 		auto_on = "Tự ngắm: BẬT",
 		auto_off = "Tự ngắm: TẮT",
 		locator_on = "Định vị: BẬT",
@@ -176,6 +190,13 @@ local languageStrings = {
 		fullbright = "Toggle Fullbright",
 		rejoin = "Rejoin Server",
 		copy_pos = "Copy Position",
+		npc_fly_on = "Fly under NPC: ON",
+		npc_fly_off = "Fly under NPC: OFF",
+		npc_tele = "Teleport under NPC",
+		auto_attack_on = "Auto attack on equip: ON",
+		auto_attack_off = "Auto attack on equip: OFF",
+		antikick_on = "Anti-kick on teleport: ON",
+		antikick_off = "Anti-kick on teleport: OFF",
 		auto_on = "Auto aim: ON",
 		auto_off = "Auto aim: OFF",
 		locator_on = "Locator: ON",
@@ -209,6 +230,85 @@ end
 local function getText(key)
 	local lang = languageStrings[currentLanguage] or languageStrings.vi
 	return lang[key] or key
+end
+
+local function getNpcRoot()
+	local cityFolder = workspace:FindFirstChild("CityNPCs")
+	local npcFolder = cityFolder and cityFolder:FindFirstChild("NPCs")
+	if not npcFolder then
+		return nil
+	end
+	local npc = npcFolder:GetChildren()[2]
+	if not npc then
+		return nil
+	end
+	return npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+end
+
+local function updateNpcFly(enable)
+	npcFlyEnabled = enable
+	if npcFlyConnection then
+		npcFlyConnection:Disconnect()
+		npcFlyConnection = nil
+	end
+	if not enable then
+		return
+	end
+	npcFlyConnection = RunService.Heartbeat:Connect(function()
+		local npcRoot = getNpcRoot()
+		if not npcRoot then
+			return
+		end
+		local character = player.Character
+		if not character then
+			return
+		end
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if root then
+			root.CFrame = npcRoot.CFrame * CFrame.new(0, -3, 0)
+		end
+	end)
+end
+
+local function updateAutoAttack(enable)
+	autoAttackEnabled = enable
+	if autoAttackConnection then
+		autoAttackConnection:Disconnect()
+		autoAttackConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoAttackConnection = RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		if not character then
+			return
+		end
+		local tool = character:FindFirstChildOfClass("Tool")
+		if tool then
+			pcall(function()
+				tool:Activate()
+			end)
+		end
+	end)
+end
+
+local function updateAntiKick(enable)
+	antiKickEnabled = enable
+	if antiKickHooked then
+		return
+	end
+	if not enable or not hookmetamethod then
+		return
+	end
+	antiKickHooked = true
+	antiKickOriginalNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+		local method = getnamecallmethod()
+		if antiKickEnabled and method == "Kick" then
+			return
+		end
+		return antiKickOriginalNamecall(self, ...)
+	end)
 end
 
 local function getAimPartLabel()
@@ -1336,6 +1436,42 @@ copyPosButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+local npcFlyToggle = createButton(utilSection, getText("npc_fly_off"))
+local npcTeleportButton = createButton(utilSection, getText("npc_tele"))
+local autoAttackToggle = createButton(utilSection, getText("auto_attack_off"))
+local antiKickToggle = createButton(utilSection, getText("antikick_off"))
+
+npcFlyToggle.MouseButton1Click:Connect(function()
+	updateNpcFly(not npcFlyEnabled)
+	npcFlyToggle.Text = npcFlyEnabled and getText("npc_fly_on") or getText("npc_fly_off")
+end)
+
+npcTeleportButton.MouseButton1Click:Connect(function()
+	updateAntiKick(antiKickEnabled)
+	local npcRoot = getNpcRoot()
+	if not npcRoot then
+		return
+	end
+	local character = player.Character
+	if not character then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.CFrame = npcRoot.CFrame * CFrame.new(0, -3, 0)
+	end
+end)
+
+autoAttackToggle.MouseButton1Click:Connect(function()
+	updateAutoAttack(not autoAttackEnabled)
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+end)
+
+antiKickToggle.MouseButton1Click:Connect(function()
+	updateAntiKick(not antiKickEnabled)
+	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
+end)
+
 -- PVP section (UI only)
 local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
 pvpSection.Size = UDim2.new(1, -24, 0, 250)
@@ -1457,6 +1593,10 @@ local function applyLanguage()
 	fullbrightButton.Text = getText("fullbright")
 	rejoinButton.Text = getText("rejoin")
 	copyPosButton.Text = getText("copy_pos")
+	npcFlyToggle.Text = npcFlyEnabled and getText("npc_fly_on") or getText("npc_fly_off")
+	npcTeleportButton.Text = getText("npc_tele")
+	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
+	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
 
 	aimToggle.Text = autoAimEnabled and getText("auto_on") or getText("auto_off")
 	locatorToggle.Text = locatorEnabled and getText("locator_on") or getText("locator_off")
