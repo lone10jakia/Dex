@@ -60,6 +60,8 @@ local autoAttackEnabled = false
 local autoAttackConnection
 local autoBandageEnabled = false
 local autoBandageConnection
+local autoCollectEnabled = false
+local autoCollectConnection
 local antiKickEnabled = false
 local antiKickHooked = false
 local antiKickOriginalNamecall
@@ -153,6 +155,8 @@ local languageStrings = {
 		auto_attack_off = "Tự đánh khi cầm vũ khí: TẮT",
 		auto_bandage_on = "Auto dùng băng gạc: BẬT",
 		auto_bandage_off = "Auto dùng băng gạc: TẮT",
+		auto_collect_on = "Auto nhặt: BẬT",
+		auto_collect_off = "Auto nhặt: TẮT",
 		antikick_on = "Anti-kick khi tele: BẬT",
 		antikick_off = "Anti-kick khi tele: TẮT",
 		collect_nearby = "Nhặt xung quanh",
@@ -246,6 +250,8 @@ local languageStrings = {
 		auto_attack_off = "Auto attack on equip: OFF",
 		auto_bandage_on = "Auto use bandage: ON",
 		auto_bandage_off = "Auto use bandage: OFF",
+		auto_collect_on = "Auto pickup: ON",
+		auto_collect_off = "Auto pickup: OFF",
 		antikick_on = "Anti-kick on teleport: ON",
 		antikick_off = "Anti-kick on teleport: OFF",
 		collect_nearby = "Collect nearby",
@@ -449,6 +455,20 @@ local function updateAutoBandage(enable)
 				end)
 			end
 		end
+	end)
+end
+
+local function updateAutoCollect(enable)
+	autoCollectEnabled = enable
+	if autoCollectConnection then
+		autoCollectConnection:Disconnect()
+		autoCollectConnection = nil
+	end
+	if not enable then
+		return
+	end
+	autoCollectConnection = RunService.Heartbeat:Connect(function()
+		collectNearbyItems()
 	end)
 end
 
@@ -1671,6 +1691,7 @@ local npcTuneDistanceUpButton = createButton(utilScroll, getText("npc_tune_dista
 local npcTuneDistanceDownButton = createButton(utilScroll, getText("npc_tune_distance_down"))
 local autoAttackToggle = createButton(utilScroll, getText("auto_attack_off"))
 local autoBandageToggle = createButton(utilScroll, getText("auto_bandage_off"))
+local autoCollectToggle = createButton(utilScroll, getText("auto_collect_off"))
 local antiKickToggle = createButton(utilScroll, getText("antikick_off"))
 local collectNearbyButton = createButton(utilScroll, getText("collect_nearby"))
 local autoHealToggle = createButton(utilScroll, getText("auto_heal_off"))
@@ -1777,6 +1798,11 @@ end)
 autoBandageToggle.MouseButton1Click:Connect(function()
 	updateAutoBandage(not autoBandageEnabled)
 	autoBandageToggle.Text = autoBandageEnabled and getText("auto_bandage_on") or getText("auto_bandage_off")
+end)
+
+autoCollectToggle.MouseButton1Click:Connect(function()
+	updateAutoCollect(not autoCollectEnabled)
+	autoCollectToggle.Text = autoCollectEnabled and getText("auto_collect_on") or getText("auto_collect_off")
 end)
 
 antiKickToggle.MouseButton1Click:Connect(function()
@@ -1936,6 +1962,7 @@ local function applyLanguage()
 	npcTuneDistanceDownButton.Text = getText("npc_tune_distance_down")
 	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
 	autoBandageToggle.Text = autoBandageEnabled and getText("auto_bandage_on") or getText("auto_bandage_off")
+	autoCollectToggle.Text = autoCollectEnabled and getText("auto_collect_on") or getText("auto_collect_off")
 	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
 	collectNearbyButton.Text = getText("collect_nearby")
 	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
