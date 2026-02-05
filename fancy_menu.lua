@@ -62,6 +62,8 @@ local autoBandageEnabled = false
 local autoBandageConnection
 local autoCollectEnabled = false
 local autoCollectConnection
+local autoCollectRadius = 20
+local vipUnlocked = false
 local antiKickEnabled = false
 local antiKickHooked = false
 local antiKickOriginalNamecall
@@ -157,6 +159,11 @@ local languageStrings = {
 		auto_bandage_off = "Auto dùng băng gạc: TẮT",
 		auto_collect_on = "Auto nhặt: BẬT",
 		auto_collect_off = "Auto nhặt: TẮT",
+		move_speed = "Tốc độ di chuyển (16)",
+		quick_collect_radius = "Bán kính nhặt (stud)",
+		apply_collect = "Áp dụng cài đặt",
+		vip_unlock_on = "Mở khóa VIP: BẬT",
+		vip_unlock_off = "Mở khóa VIP: TẮT",
 		antikick_on = "Anti-kick khi tele: BẬT",
 		antikick_off = "Anti-kick khi tele: TẮT",
 		collect_nearby = "Nhặt xung quanh",
@@ -252,6 +259,11 @@ local languageStrings = {
 		auto_bandage_off = "Auto use bandage: OFF",
 		auto_collect_on = "Auto pickup: ON",
 		auto_collect_off = "Auto pickup: OFF",
+		move_speed = "Move speed (16)",
+		quick_collect_radius = "Pickup radius (stud)",
+		apply_collect = "Apply settings",
+		vip_unlock_on = "VIP unlock: ON",
+		vip_unlock_off = "VIP unlock: OFF",
 		antikick_on = "Anti-kick on teleport: ON",
 		antikick_off = "Anti-kick on teleport: OFF",
 		collect_nearby = "Collect nearby",
@@ -409,6 +421,8 @@ local function updateAutoAttack(enable)
 	end)
 end
 
+local collectNearbyItems
+
 local function findBandageTool()
 	local character = player.Character
 	local backpack = player:FindFirstChild("Backpack")
@@ -468,11 +482,11 @@ local function updateAutoCollect(enable)
 		return
 	end
 	autoCollectConnection = RunService.Heartbeat:Connect(function()
-		collectNearbyItems()
+		collectNearbyItems(autoCollectRadius)
 	end)
 end
 
-local function collectNearbyItems()
+collectNearbyItems = function(radiusOverride)
 	local character = player.Character
 	if not character then
 		return
@@ -481,7 +495,7 @@ local function collectNearbyItems()
 	if not root then
 		return
 	end
-	local radius = 20
+	local radius = radiusOverride or autoCollectRadius
 	for _, item in ipairs(workspace:GetDescendants()) do
 		if item:IsA("Tool") and item.Parent ~= character then
 			local handle = item:FindFirstChild("Handle")
@@ -1692,6 +1706,10 @@ local npcTuneDistanceDownButton = createButton(utilScroll, getText("npc_tune_dis
 local autoAttackToggle = createButton(utilScroll, getText("auto_attack_off"))
 local autoBandageToggle = createButton(utilScroll, getText("auto_bandage_off"))
 local autoCollectToggle = createButton(utilScroll, getText("auto_collect_off"))
+local moveSpeedInput = createInput(utilScroll, getText("move_speed"))
+local quickCollectRadiusInput = createInput(utilScroll, getText("quick_collect_radius"))
+local applyCollectButton = createButton(utilScroll, getText("apply_collect"))
+local vipUnlockToggle = createButton(utilScroll, getText("vip_unlock_off"))
 local antiKickToggle = createButton(utilScroll, getText("antikick_off"))
 local collectNearbyButton = createButton(utilScroll, getText("collect_nearby"))
 local autoHealToggle = createButton(utilScroll, getText("auto_heal_off"))
@@ -1803,6 +1821,26 @@ end)
 autoCollectToggle.MouseButton1Click:Connect(function()
 	updateAutoCollect(not autoCollectEnabled)
 	autoCollectToggle.Text = autoCollectEnabled and getText("auto_collect_on") or getText("auto_collect_off")
+end)
+
+applyCollectButton.MouseButton1Click:Connect(function()
+	local moveSpeedValue = tonumber(moveSpeedInput.Text)
+	if moveSpeedValue then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = math.clamp(moveSpeedValue, 1, 300)
+		end
+	end
+	local radiusValue = tonumber(quickCollectRadiusInput.Text)
+	if radiusValue then
+		autoCollectRadius = math.clamp(radiusValue, 5, 120)
+	end
+end)
+
+vipUnlockToggle.MouseButton1Click:Connect(function()
+	vipUnlocked = not vipUnlocked
+	vipUnlockToggle.Text = vipUnlocked and getText("vip_unlock_on") or getText("vip_unlock_off")
 end)
 
 antiKickToggle.MouseButton1Click:Connect(function()
@@ -1963,6 +2001,10 @@ local function applyLanguage()
 	autoAttackToggle.Text = autoAttackEnabled and getText("auto_attack_on") or getText("auto_attack_off")
 	autoBandageToggle.Text = autoBandageEnabled and getText("auto_bandage_on") or getText("auto_bandage_off")
 	autoCollectToggle.Text = autoCollectEnabled and getText("auto_collect_on") or getText("auto_collect_off")
+	moveSpeedInput.PlaceholderText = getText("move_speed")
+	quickCollectRadiusInput.PlaceholderText = getText("quick_collect_radius")
+	applyCollectButton.Text = getText("apply_collect")
+	vipUnlockToggle.Text = vipUnlocked and getText("vip_unlock_on") or getText("vip_unlock_off")
 	antiKickToggle.Text = antiKickEnabled and getText("antikick_on") or getText("antikick_off")
 	collectNearbyButton.Text = getText("collect_nearby")
 	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
