@@ -305,6 +305,35 @@ local function isHealTool(tool)
 	return n:find("bang") or n:find("băng") or n:find("med") or n:find("heal") or n:find("kit") or n:find("band")
 end
 
+local function findBandagePrompt()
+	for _, prompt in ipairs(workspace:GetDescendants()) do
+		if prompt:IsA("ProximityPrompt") then
+			local name = prompt.Parent and prompt.Parent.Name and prompt.Parent.Name:lower() or ""
+			if name:find("bang") or name:find("băng") or name:find("bandage") then
+				return prompt
+			end
+		end
+	end
+	return nil
+end
+
+local function buyBandagePack()
+	if not fireproximityprompt then
+		return false
+	end
+	local prompt = findBandagePrompt()
+	if not prompt then
+		return false
+	end
+	for _ = 1, 5 do
+		pcall(function()
+			fireproximityprompt(prompt)
+		end)
+		task.wait(0.2)
+	end
+	return true
+end
+
 local preferredWeaponName = ""
 local function setPreferredWeapon(tool)
 	if tool and tool:IsA("Tool") and not isHealTool(tool) then
@@ -416,7 +445,13 @@ task.spawn(function()
 
 		local healTool = findHealTool()
 		if not healTool then
-			continue
+			if buyBandagePack() then
+				task.wait(0.4)
+				healTool = findHealTool()
+			end
+			if not healTool then
+				continue
+			end
 		end
 
 		local current = char:FindFirstChildOfClass("Tool")
