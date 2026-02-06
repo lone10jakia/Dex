@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local lp = Players.LocalPlayer
+local VirtualUser = game:GetService("VirtualUser")
 
 -- Key GUI
 local keyGui = Instance.new("ScreenGui")
@@ -32,7 +33,7 @@ do
 			return
 		end
 		elapsed = 0
-		UIStroke.Color = Color3.fromHSV((tick() * 1.2 % 1), 1, 1)
+		UIStroke.Color = Color3.fromHSV((tick() * 0.6 % 1), 1, 1)
 	end)
 end
 
@@ -100,6 +101,12 @@ confirm.MouseButton1Click:Connect(function()
 end)
 repeat task.wait() until Valid
 
+-- ====================[ ANTI AFK ]===================
+lp.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new())
+end)
+
 -- ====================[ NHÂN VẬT ]===================
 local hrp, hum
 local function getChar()
@@ -138,7 +145,7 @@ do
 			return
 		end
 		elapsed = 0
-		UIStroke2.Color = Color3.fromHSV((tick() * 1.5 % 1), 1, 1)
+		UIStroke2.Color = Color3.fromHSV((tick() * 0.7 % 1), 1, 1)
 	end)
 end
 
@@ -298,6 +305,35 @@ local function isHealTool(tool)
 	return n:find("bang") or n:find("băng") or n:find("med") or n:find("heal") or n:find("kit") or n:find("band")
 end
 
+local function findBandagePrompt()
+	for _, prompt in ipairs(workspace:GetDescendants()) do
+		if prompt:IsA("ProximityPrompt") then
+			local name = prompt.Parent and prompt.Parent.Name and prompt.Parent.Name:lower() or ""
+			if name:find("bang") or name:find("băng") or name:find("bandage") then
+				return prompt
+			end
+		end
+	end
+	return nil
+end
+
+local function buyBandagePack()
+	if not fireproximityprompt then
+		return false
+	end
+	local prompt = findBandagePrompt()
+	if not prompt then
+		return false
+	end
+	for _ = 1, 5 do
+		pcall(function()
+			fireproximityprompt(prompt)
+		end)
+		task.wait(0.2)
+	end
+	return true
+end
+
 local preferredWeaponName = ""
 local function setPreferredWeapon(tool)
 	if tool and tool:IsA("Tool") and not isHealTool(tool) then
@@ -409,7 +445,13 @@ task.spawn(function()
 
 		local healTool = findHealTool()
 		if not healTool then
-			continue
+			if buyBandagePack() then
+				task.wait(0.4)
+				healTool = findHealTool()
+			end
+			if not healTool then
+				continue
+			end
 		end
 
 		local current = char:FindFirstChildOfClass("Tool")
