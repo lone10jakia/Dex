@@ -17,7 +17,7 @@ local Frame = Instance.new("Frame", keyGui)
 Frame.Size = UDim2.new(0, 360, 0, 220)
 Frame.Position = UDim2.new(0.5, -180, 0.5, -110)
 Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Frame.BackgroundTransparency = 0.2
+Frame.BackgroundTransparency = 0.5
 Frame.Active = true
 Frame.Draggable = true
 Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 14)
@@ -45,6 +45,8 @@ title.BackgroundTransparency = 1
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 22
+title.TextStrokeColor3 = Color3.new(0, 0, 0)
+title.TextStrokeTransparency = 0.2
 
 -- Info
 local info = Instance.new("TextLabel", Frame)
@@ -56,6 +58,8 @@ info.TextColor3 = Color3.fromRGB(220, 220, 220)
 info.Font = Enum.Font.Gotham
 info.TextSize = 17
 info.TextWrapped = true
+info.TextStrokeColor3 = Color3.new(0, 0, 0)
+info.TextStrokeTransparency = 0.4
 
 -- Input box
 local box = Instance.new("TextBox", Frame)
@@ -79,6 +83,8 @@ confirm.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 confirm.TextColor3 = Color3.new(1, 1, 1)
 confirm.Font = Enum.Font.GothamBold
 confirm.TextSize = 18
+confirm.TextStrokeColor3 = Color3.new(0, 0, 0)
+confirm.TextStrokeTransparency = 0.2
 Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 
 -- Keys
@@ -129,7 +135,7 @@ local main = Instance.new("Frame", guiMain)
 main.Size = UDim2.new(0, 300, 0, 470)
 main.Position = UDim2.new(0.05, 0, 0.2, 0)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-main.BackgroundTransparency = 0.2
+main.BackgroundTransparency = 0.5
 main.Active = true
 main.Draggable = true
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
@@ -156,8 +162,10 @@ title2.Position = UDim2.new(0, 0, 0, 0)
 title2.BackgroundTransparency = 1
 title2.Text = "MEMAYBEO HUB"
 title2.TextColor3 = Color3.new(1, 1, 1)
-title2.Font = Enum.Font.SourceSansBold
+title2.Font = Enum.Font.GothamBlack
 title2.TextSize = 18
+title2.TextStrokeColor3 = Color3.new(0, 0, 0)
+title2.TextStrokeTransparency = 0.2
 
 -- Collapse button
 local collapseBtn = Instance.new("TextButton", main)
@@ -181,6 +189,10 @@ btnFarm.Position = UDim2.new(0, 20, 0, 10)
 btnFarm.Text = "✅ Auto Farm NPC2"
 btnFarm.TextColor3 = Color3.new(1, 1, 1)
 btnFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnFarm.BackgroundTransparency = 0.2
+btnFarm.Font = Enum.Font.GothamBold
+btnFarm.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnFarm.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnFarm).CornerRadius = UDim.new(0, 8)
 
 -- Auto Pickup
@@ -190,6 +202,10 @@ btnPickup.Position = UDim2.new(0, 20, 0, 50)
 btnPickup.Text = "🟢 Auto Nhặt Vật Phẩm (OFF)"
 btnPickup.TextColor3 = Color3.new(1, 1, 1)
 btnPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnPickup.BackgroundTransparency = 0.2
+btnPickup.Font = Enum.Font.GothamBold
+btnPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnPickup).CornerRadius = UDim.new(0, 8)
 
 -- Server Hop
@@ -199,6 +215,10 @@ btnHop.Position = UDim2.new(0, 20, 0, 90)
 btnHop.Text = "🌐 Đổi Server"
 btnHop.TextColor3 = Color3.new(1, 1, 1)
 btnHop.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnHop.BackgroundTransparency = 0.2
+btnHop.Font = Enum.Font.GothamBold
+btnHop.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnHop.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnHop).CornerRadius = UDim.new(0, 8)
 
 -- Thanh HP
@@ -206,59 +226,92 @@ local hpBg = Instance.new("Frame", content)
 hpBg.Size = UDim2.new(1, -40, 0, 25)
 hpBg.Position = UDim2.new(0, 20, 0, 130)
 hpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+hpBg.BackgroundTransparency = 0.2
 Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 6)
 
 local hpLabel = Instance.new("TextLabel", hpBg)
 hpLabel.Size = UDim2.new(1, 0, 1, 0)
 hpLabel.BackgroundTransparency = 1
 hpLabel.TextColor3 = Color3.new(1, 1, 1)
-hpLabel.Font = Enum.Font.SourceSansBold
+hpLabel.Font = Enum.Font.GothamBlack
 hpLabel.TextSize = 16
 hpLabel.Text = "NPC2: ??? / ???"
+hpLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+hpLabel.TextStrokeTransparency = 0.2
+
+local npcCountLabel = Instance.new("TextLabel", content)
+npcCountLabel.Size = UDim2.new(0, 260, 0, 20)
+npcCountLabel.Position = UDim2.new(0, 20, 0, 155)
+npcCountLabel.BackgroundTransparency = 1
+npcCountLabel.TextColor3 = Color3.new(1, 1, 1)
+npcCountLabel.Font = Enum.Font.GothamBold
+npcCountLabel.TextSize = 14
+npcCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+npcCountLabel.Text = "NPC2 còn: 0"
+npcCountLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+npcCountLabel.TextStrokeTransparency = 0.25
 
 -- Auto băng + chọn vũ khí
 local btnAutoBang = Instance.new("TextButton", content)
 btnAutoBang.Size = UDim2.new(0, 260, 0, 30)
-btnAutoBang.Position = UDim2.new(0, 20, 0, 170)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 180)
 btnAutoBang.Text = "🤕 Auto Băng (OFF)"
 btnAutoBang.TextColor3 = Color3.new(1, 1, 1)
 btnAutoBang.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnAutoBang.BackgroundTransparency = 0.2
+btnAutoBang.Font = Enum.Font.GothamBold
+btnAutoBang.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnAutoBang.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
 local btnCityFarm = Instance.new("TextButton", content)
 btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
-btnCityFarm.Position = UDim2.new(0, 20, 0, 170)
+btnCityFarm.Position = UDim2.new(0, 20, 0, 180)
 btnCityFarm.Text = "⚔️ Auto Farm CityNPC (OFF)"
 btnCityFarm.TextColor3 = Color3.new(1, 1, 1)
 btnCityFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnCityFarm.BackgroundTransparency = 0.2
+btnCityFarm.Font = Enum.Font.GothamBold
+btnCityFarm.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnCityFarm.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityFarm).CornerRadius = UDim.new(0, 8)
 
 local btnCityPickup = Instance.new("TextButton", content)
 btnCityPickup.Size = UDim2.new(0, 260, 0, 30)
-btnCityPickup.Position = UDim2.new(0, 20, 0, 210)
+btnCityPickup.Position = UDim2.new(0, 20, 0, 220)
 btnCityPickup.Text = "📦 Nhặt Drop CityNPC (OFF)"
 btnCityPickup.TextColor3 = Color3.new(1, 1, 1)
 btnCityPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnCityPickup.BackgroundTransparency = 0.2
+btnCityPickup.Font = Enum.Font.GothamBold
+btnCityPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnCityPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 250)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 260)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 290)
+weaponLabel.Position = UDim2.new(0, 20, 0, 300)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-weaponLabel.Font = Enum.Font.SourceSans
+weaponLabel.Font = Enum.Font.GothamBold
 weaponLabel.TextSize = 16
 weaponLabel.TextXAlignment = Enum.TextXAlignment.Left
 weaponLabel.Text = "🎯 Vũ khí: (chưa chọn)"
+weaponLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 315)
+btnWeapon.Position = UDim2.new(0, 20, 0, 325)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnWeapon.BackgroundTransparency = 0.2
+btnWeapon.Font = Enum.Font.GothamBold
+btnWeapon.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnWeapon.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnWeapon).CornerRadius = UDim.new(0, 8)
 
 -- Collapse logic
@@ -536,11 +589,13 @@ end)
 -- Find nearest NPC2
 local function getNearestNPC2()
 	local nearest, dist, npcHRP = nil, 99999, nil
+	local count = 0
 	for _, m in ipairs(workspace:GetDescendants()) do
 		if m:IsA("Model") and m.Name == "NPC2" then
 			local h = m:FindFirstChildOfClass("Humanoid")
 			local p = m:FindFirstChild("HumanoidRootPart")
 			if h and p and h.Health > 0 then
+				count += 1
 				local d = (p.Position - hrp.Position).Magnitude
 				if d < dist then
 					nearest = m
@@ -550,7 +605,7 @@ local function getNearestNPC2()
 			end
 		end
 	end
-	return nearest, npcHRP
+	return nearest, npcHRP, count
 end
 
 local function getCityNPC()
@@ -578,9 +633,14 @@ RunService.Heartbeat:Connect(function(dt)
 		if farming then
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
-				orbitAngle += dt * 15
-				local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 10
-				hrp.CFrame = CFrame.new(npcHRP.Position + offset, npcHRP.Position)
+				local distance = (npcHRP.Position - hrp.Position).Magnitude
+				if distance > 60 then
+					hrp.CFrame = CFrame.new(npcHRP.Position + Vector3.new(0, 3, 0), npcHRP.Position)
+				else
+					orbitAngle += dt * 15
+					local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 10
+					hrp.CFrame = CFrame.new(npcHRP.Position + offset, npcHRP.Position)
+				end
 
 				local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
 				if tool then
@@ -608,9 +668,14 @@ RunService.Heartbeat:Connect(function(dt)
 				local h = cityNpc:FindFirstChildOfClass("Humanoid")
 				local p = cityNpc:FindFirstChild("HumanoidRootPart")
 				if h and p and h.Health > 0 then
-					orbitAngle += dt * 12
-					local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 9
-					hrp.CFrame = CFrame.new(p.Position + offset, p.Position)
+					local distance = (p.Position - hrp.Position).Magnitude
+					if distance > 60 then
+						hrp.CFrame = CFrame.new(p.Position + Vector3.new(0, 3, 0), p.Position)
+					else
+						orbitAngle += dt * 12
+						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 9
+						hrp.CFrame = CFrame.new(p.Position + offset, p.Position)
+					end
 					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
 					if tool then
 						tool.Parent = lp.Character
@@ -631,12 +696,15 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 
 		-- Update HP
-		local npc = getNearestNPC2()
+		local npc, _, count = getNearestNPC2()
 		if npc and npc:FindFirstChildOfClass("Humanoid") then
 			local h = npc:FindFirstChildOfClass("Humanoid")
 			hpLabel.Text = "NPC2: " .. math.floor(h.Health) .. " / " .. math.floor(h.MaxHealth)
 		else
 			hpLabel.Text = "NPC2: Không thấy"
+		end
+		if count then
+			npcCountLabel.Text = "NPC2 còn: " .. tostring(count)
 		end
 	end
 end)
