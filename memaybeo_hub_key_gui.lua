@@ -29,11 +29,11 @@ do
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)
 		elapsed += dt
-		if elapsed < 0.12 then
+		if elapsed < 0.2 then
 			return
 		end
 		elapsed = 0
-		UIStroke.Color = Color3.fromHSV((tick() * 0.6 % 1), 1, 1)
+		UIStroke.Color = Color3.fromHSV((tick() * 0.35 % 1), 1, 1)
 	end)
 end
 
@@ -141,11 +141,11 @@ do
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)
 		elapsed += dt
-		if elapsed < 0.12 then
+		if elapsed < 0.2 then
 			return
 		end
 		elapsed = 0
-		UIStroke2.Color = Color3.fromHSV((tick() * 0.7 % 1), 1, 1)
+		UIStroke2.Color = Color3.fromHSV((tick() * 0.4 % 1), 1, 1)
 	end)
 end
 
