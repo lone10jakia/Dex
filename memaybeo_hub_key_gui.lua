@@ -703,7 +703,7 @@ RunService.Heartbeat:Connect(function(dt)
 							tool:Activate()
 						end)
 					end
-					if distance <= 8 then
+					if h.Health <= 0 then
 						cityNpcIndex += 1
 					end
 				else
