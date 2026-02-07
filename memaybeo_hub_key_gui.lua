@@ -464,6 +464,20 @@ local function waitForEquipped(char, tool, timeout)
 	return char:FindFirstChildOfClass("Tool") == tool
 end
 
+local function collectDropParts(container)
+	for _, item in ipairs(container:GetDescendants()) do
+		if item:IsA("BasePart") then
+			pcall(function()
+				hrp.CFrame = CFrame.new(item.Position)
+			end)
+		elseif item:IsA("ProximityPrompt") and fireproximityprompt then
+			pcall(function()
+				fireproximityprompt(item)
+			end)
+		end
+	end
+end
+
 task.spawn(function()
 	while task.wait(0.25) do
 		if not autoBang or healingInProgress then
@@ -605,13 +619,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local dropFolder = workspace:FindFirstChild("CityNPCs")
 			dropFolder = dropFolder and dropFolder:FindFirstChild("Drop")
 			if dropFolder then
-				for _, item in ipairs(dropFolder:GetChildren()) do
-					if item:IsA("BasePart") then
-						pcall(function()
-							hrp.CFrame = CFrame.new(item.Position)
-						end)
-					end
-				end
+				collectDropParts(dropFolder)
 			end
 		end
 
