@@ -617,14 +617,20 @@ local function getCityNPC()
 	if not npcFolder then
 		return nil
 	end
+	local nearest = nil
+	local dist = math.huge
 	for _, npc in ipairs(npcFolder:GetChildren()) do
 		local h = npc:FindFirstChildOfClass("Humanoid")
 		local p = npc:FindFirstChild("HumanoidRootPart")
 		if h and p and h.Health > 0 then
-			return npc
+			local d = (p.Position - hrp.Position).Magnitude
+			if d < dist then
+				nearest = npc
+				dist = d
+			end
 		end
 	end
-	return nil
+	return nearest
 end
 
 -- Heartbeat loop
