@@ -251,10 +251,22 @@ npcCountLabel.Text = "NPC2 còn: 0"
 npcCountLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 npcCountLabel.TextStrokeTransparency = 0.25
 
+local cityCountLabel = Instance.new("TextLabel", content)
+cityCountLabel.Size = UDim2.new(0, 260, 0, 20)
+cityCountLabel.Position = UDim2.new(0, 20, 0, 175)
+cityCountLabel.BackgroundTransparency = 1
+cityCountLabel.TextColor3 = Color3.new(1, 1, 1)
+cityCountLabel.Font = Enum.Font.GothamBold
+cityCountLabel.TextSize = 14
+cityCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+cityCountLabel.Text = "CityNPC còn: 0"
+cityCountLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+cityCountLabel.TextStrokeTransparency = 0.25
+
 -- Auto băng + chọn vũ khí
 local btnAutoBang = Instance.new("TextButton", content)
 btnAutoBang.Size = UDim2.new(0, 260, 0, 30)
-btnAutoBang.Position = UDim2.new(0, 20, 0, 180)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 200)
 btnAutoBang.Text = "🤕 Auto Băng (OFF)"
 btnAutoBang.TextColor3 = Color3.new(1, 1, 1)
 btnAutoBang.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -266,7 +278,7 @@ Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
 local btnCityFarm = Instance.new("TextButton", content)
 btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
-btnCityFarm.Position = UDim2.new(0, 20, 0, 180)
+btnCityFarm.Position = UDim2.new(0, 20, 0, 200)
 btnCityFarm.Text = "⚔️ Auto Farm CityNPC (OFF)"
 btnCityFarm.TextColor3 = Color3.new(1, 1, 1)
 btnCityFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -278,7 +290,7 @@ Instance.new("UICorner", btnCityFarm).CornerRadius = UDim.new(0, 8)
 
 local btnCityPickup = Instance.new("TextButton", content)
 btnCityPickup.Size = UDim2.new(0, 260, 0, 30)
-btnCityPickup.Position = UDim2.new(0, 20, 0, 220)
+btnCityPickup.Position = UDim2.new(0, 20, 0, 240)
 btnCityPickup.Text = "📦 Nhặt Drop CityNPC (OFF)"
 btnCityPickup.TextColor3 = Color3.new(1, 1, 1)
 btnCityPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -288,11 +300,11 @@ btnCityPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnCityPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 260)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 280)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 300)
+weaponLabel.Position = UDim2.new(0, 20, 0, 320)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -304,7 +316,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 325)
+btnWeapon.Position = UDim2.new(0, 20, 0, 345)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -611,18 +623,20 @@ end
 local function getCityNPC()
 	local folder = workspace:FindFirstChild("CityNPCs")
 	if not folder then
-		return nil
+		return nil, 0
 	end
 	local npcFolder = folder:FindFirstChild("NPCs")
 	if not npcFolder then
-		return nil
+		return nil, 0
 	end
 	local nearest = nil
 	local dist = math.huge
+	local count = 0
 	for _, npc in ipairs(npcFolder:GetChildren()) do
 		local h = npc:FindFirstChildOfClass("Humanoid")
 		local p = npc:FindFirstChild("HumanoidRootPart")
 		if h and p and h.Health > 0 then
+			count += 1
 			local d = (p.Position - hrp.Position).Magnitude
 			if d < dist then
 				nearest = npc
@@ -630,7 +644,7 @@ local function getCityNPC()
 			end
 		end
 	end
-	return nearest
+	return nearest, count
 end
 
 -- Heartbeat loop
@@ -668,8 +682,8 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 
+		local cityNpc, cityCount = getCityNPC()
 		if cityFarm then
-			local cityNpc = getCityNPC()
 			if cityNpc then
 				local h = cityNpc:FindFirstChildOfClass("Humanoid")
 				local p = cityNpc:FindFirstChild("HumanoidRootPart")
@@ -711,6 +725,9 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		if count then
 			npcCountLabel.Text = "NPC2 còn: " .. tostring(count)
+		end
+		if cityCount then
+			cityCountLabel.Text = "CityNPC còn: " .. tostring(cityCount)
 		end
 	end
 end)
