@@ -341,6 +341,7 @@ local autoPickup = false
 local orbitAngle = 0
 local cityFarm = false
 local cityPickup = false
+local cityNpcIndex = 1
 
 btnFarm.MouseButton1Click:Connect(function()
 	farming = not farming
@@ -620,31 +621,26 @@ local function getNearestNPC2()
 	return nearest, npcHRP, count
 end
 
-local function getCityNPC()
+local function getCityNPCs()
 	local folder = workspace:FindFirstChild("CityNPCs")
 	if not folder then
-		return nil, 0
+		return {}, 0
 	end
 	local npcFolder = folder:FindFirstChild("NPCs")
 	if not npcFolder then
-		return nil, 0
+		return {}, 0
 	end
-	local nearest = nil
-	local dist = math.huge
 	local count = 0
+	local list = {}
 	for _, npc in ipairs(npcFolder:GetChildren()) do
 		local h = npc:FindFirstChildOfClass("Humanoid")
 		local p = npc:FindFirstChild("HumanoidRootPart")
 		if h and p and h.Health > 0 then
 			count += 1
-			local d = (p.Position - hrp.Position).Magnitude
-			if d < dist then
-				nearest = npc
-				dist = d
-			end
+			table.insert(list, npc)
 		end
 	end
-	return nearest, count
+	return list, count
 end
 
 -- Heartbeat loop
@@ -682,11 +678,15 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 
-		local cityNpc, cityCount = getCityNPC()
+		local cityNpcs, cityCount = getCityNPCs()
 		if cityFarm then
-			if cityNpc then
-				local h = cityNpc:FindFirstChildOfClass("Humanoid")
-				local p = cityNpc:FindFirstChild("HumanoidRootPart")
+			if #cityNpcs > 0 then
+				if cityNpcIndex > #cityNpcs then
+					cityNpcIndex = 1
+				end
+				local cityNpc = cityNpcs[cityNpcIndex]
+				local h = cityNpc and cityNpc:FindFirstChildOfClass("Humanoid")
+				local p = cityNpc and cityNpc:FindFirstChild("HumanoidRootPart")
 				if h and p and h.Health > 0 then
 					local distance = (p.Position - hrp.Position).Magnitude
 					if distance > 60 then
@@ -703,6 +703,14 @@ RunService.Heartbeat:Connect(function(dt)
 							tool:Activate()
 						end)
 					end
+					if distance <= 8 then
+						cityNpcIndex += 1
+					end
+				else
+					cityNpcIndex += 1
+				end
+				if cityNpcIndex > #cityNpcs then
+					cityNpcIndex = 1
 				end
 			end
 		end
