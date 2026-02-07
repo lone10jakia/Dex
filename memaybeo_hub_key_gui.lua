@@ -562,7 +562,14 @@ local function getCityNPC()
 	if not npcFolder then
 		return nil
 	end
-	return npcFolder:GetChildren()[3]
+	for _, npc in ipairs(npcFolder:GetChildren()) do
+		local h = npc:FindFirstChildOfClass("Humanoid")
+		local p = npc:FindFirstChild("HumanoidRootPart")
+		if h and p and h.Health > 0 then
+			return npc
+		end
+	end
+	return nil
 end
 
 -- Heartbeat loop
