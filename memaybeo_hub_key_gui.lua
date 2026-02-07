@@ -126,7 +126,7 @@ local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
 guiMain.Name = "MEMAYBEO_HUB"
 
 local main = Instance.new("Frame", guiMain)
-main.Size = UDim2.new(0, 300, 0, 430)
+main.Size = UDim2.new(0, 300, 0, 470)
 main.Position = UDim2.new(0.05, 0, 0.2, 0)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 main.BackgroundTransparency = 0.2
@@ -225,9 +225,27 @@ btnAutoBang.TextColor3 = Color3.new(1, 1, 1)
 btnAutoBang.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
+local btnCityFarm = Instance.new("TextButton", content)
+btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
+btnCityFarm.Position = UDim2.new(0, 20, 0, 170)
+btnCityFarm.Text = "⚔️ Auto Farm CityNPC (OFF)"
+btnCityFarm.TextColor3 = Color3.new(1, 1, 1)
+btnCityFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", btnCityFarm).CornerRadius = UDim.new(0, 8)
+
+local btnCityPickup = Instance.new("TextButton", content)
+btnCityPickup.Size = UDim2.new(0, 260, 0, 30)
+btnCityPickup.Position = UDim2.new(0, 20, 0, 210)
+btnCityPickup.Text = "📦 Nhặt Drop CityNPC (OFF)"
+btnCityPickup.TextColor3 = Color3.new(1, 1, 1)
+btnCityPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
+
+btnAutoBang.Position = UDim2.new(0, 20, 0, 250)
+
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 210)
+weaponLabel.Position = UDim2.new(0, 20, 0, 290)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.SourceSans
@@ -237,7 +255,7 @@ weaponLabel.Text = "🎯 Vũ khí: (chưa chọn)"
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 235)
+btnWeapon.Position = UDim2.new(0, 20, 0, 315)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -248,7 +266,7 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
-	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 430)
+	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 470)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
 
@@ -256,6 +274,8 @@ end)
 local farming = false
 local autoPickup = false
 local orbitAngle = 0
+local cityFarm = false
+local cityPickup = false
 
 btnFarm.MouseButton1Click:Connect(function()
 	farming = not farming
@@ -300,18 +320,33 @@ btnHop.MouseButton1Click:Connect(function()
 	end
 end)
 
+btnCityFarm.MouseButton1Click:Connect(function()
+	cityFarm = not cityFarm
+	btnCityFarm.Text = cityFarm and "⚔️ Auto Farm CityNPC (ON)" or "⚔️ Auto Farm CityNPC (OFF)"
+	btnCityFarm.BackgroundColor3 = cityFarm and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+end)
+
+btnCityPickup.MouseButton1Click:Connect(function()
+	cityPickup = not cityPickup
+	btnCityPickup.Text = cityPickup and "📦 Nhặt Drop CityNPC (ON)" or "📦 Nhặt Drop CityNPC (OFF)"
+	btnCityPickup.BackgroundColor3 = cityPickup and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+end)
+
 local function isHealTool(tool)
 	local n = tool.Name:lower()
 	return n:find("bang") or n:find("băng") or n:find("med") or n:find("heal") or n:find("kit") or n:find("band")
 end
 
 local function findBandagePrompt()
-	for _, prompt in ipairs(workspace:GetDescendants()) do
+	local shop = workspace:FindFirstChild("NPCs")
+		and workspace.NPCs:FindFirstChild("Shop")
+		and workspace.NPCs.Shop:FindFirstChild("Bán băng gạc")
+	if not shop then
+		return nil
+	end
+	for _, prompt in ipairs(shop:GetDescendants()) do
 		if prompt:IsA("ProximityPrompt") then
-			local name = prompt.Parent and prompt.Parent.Name and prompt.Parent.Name:lower() or ""
-			if name:find("bang") or name:find("băng") or name:find("bandage") then
-				return prompt
-			end
+			return prompt
 		end
 	end
 	return nil
@@ -504,6 +539,18 @@ local function getNearestNPC2()
 	return nearest, npcHRP
 end
 
+local function getCityNPC()
+	local folder = workspace:FindFirstChild("CityNPCs")
+	if not folder then
+		return nil
+	end
+	local npcFolder = folder:FindFirstChild("NPCs")
+	if not npcFolder then
+		return nil
+	end
+	return npcFolder:GetChildren()[3]
+end
+
 -- Heartbeat loop
 RunService.Heartbeat:Connect(function(dt)
 	if hrp and hum and hum.Health > 0 then
@@ -530,6 +577,40 @@ RunService.Heartbeat:Connect(function(dt)
 					pcall(function()
 						hrp.CFrame = CFrame.new(item.Position)
 					end)
+				end
+			end
+		end
+
+		if cityFarm then
+			local cityNpc = getCityNPC()
+			if cityNpc then
+				local h = cityNpc:FindFirstChildOfClass("Humanoid")
+				local p = cityNpc:FindFirstChild("HumanoidRootPart")
+				if h and p and h.Health > 0 then
+					orbitAngle += dt * 12
+					local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 9
+					hrp.CFrame = CFrame.new(p.Position + offset, p.Position)
+					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+					if tool then
+						tool.Parent = lp.Character
+						pcall(function()
+							tool:Activate()
+						end)
+					end
+				end
+			end
+		end
+
+		if cityPickup then
+			local dropFolder = workspace:FindFirstChild("CityNPCs")
+			dropFolder = dropFolder and dropFolder:FindFirstChild("Drop")
+			if dropFolder then
+				for _, item in ipairs(dropFolder:GetChildren()) do
+					if item:IsA("BasePart") then
+						pcall(function()
+							hrp.CFrame = CFrame.new(item.Position)
+						end)
+					end
 				end
 			end
 		end
