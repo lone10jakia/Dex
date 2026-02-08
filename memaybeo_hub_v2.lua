@@ -61,7 +61,7 @@ ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 130, 0, 320)
+MainFrame.Size = UDim2.new(0, 130, 0, 350)
 MainFrame.Position = UDim2.new(1, 150, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Visible = false
@@ -126,6 +126,17 @@ WeaponInput.ClearTextOnFocus = false
 WeaponInput.Parent = MainFrame
 Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 
+local WeaponSelectButton = Instance.new("TextButton")
+WeaponSelectButton.Size = UDim2.new(0, 110, 0, 26)
+WeaponSelectButton.Position = UDim2.new(0, 10, 0, 316)
+WeaponSelectButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+WeaponSelectButton.TextSize = 11
+WeaponSelectButton.Font = Enum.Font.Gotham
+WeaponSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WeaponSelectButton.Parent = MainFrame
+Instance.new("UICorner", WeaponSelectButton).CornerRadius = UDim.new(0, 5)
+
 -- Variables
 local spinActive = persisted.spinActive or false
 local speedBoost = persisted.speedBoost or false
@@ -145,6 +156,8 @@ local spinSpeed = 2500
 local normalSpeed, boostedSpeed = 16, 32
 local stunDuration = 0.6
 local stunSpeed = 8
+local autoBangThreshold = 75
+local autoBangCooldown = 0.4
 
 local function persistState()
 	saveSettings({
@@ -394,7 +407,7 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------------------
--- AUTO BĂNG CHUẨN <50 HP
+-- AUTO BĂNG CHUẨN <75 HP
 ------------------------------------------------------------------------
 
 AutoBangButton.MouseButton1Click:Connect(function()
@@ -443,7 +456,20 @@ local function syncPreferredWeaponFromTool(tool)
 
 	preferredWeaponName = tool.Name
 	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+end
+
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
 end
 
 local function waitForEquipped(char, tool, timeout)
@@ -457,12 +483,19 @@ local function waitForEquipped(char, tool, timeout)
 	return char:FindFirstChildOfClass("Tool") == tool
 end
 
+local lastHealAt = 0
+local healingInProgress = false
+
 task.spawn(function()
 	while task.wait(0.2) do
-		if autoBang and LocalPlayer.Character then
+		if autoBang and LocalPlayer.Character and not healingInProgress then
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
-			if not hum or hum.Health >= 50 then
+			if not hum or hum.Health >= autoBangThreshold then
+				continue
+			end
+
+			if os.clock() - lastHealAt < autoBangCooldown then
 				continue
 			end
 
@@ -489,19 +522,25 @@ task.spawn(function()
 				old = current
 			end
 
+			healingInProgress = true
 			hum:EquipTool(heal)
-			task.wait(0.2)
-			pcall(function()
-				heal:Activate()
-			end)
+			waitForEquipped(char, heal, 1)
+
+			local start = os.clock()
+			while autoBang and hum.Health < hum.MaxHealth and (os.clock() - start) < 6 do
+				pcall(function()
+					heal:Activate()
+				end)
+				task.wait(0.35)
+			end
+			lastHealAt = os.clock()
+			healingInProgress = false
 
 			local preferred = findToolByName(preferredWeaponName)
 			local returnTool = preferred or old
 			if returnTool then
-				task.defer(function()
-					hum:EquipTool(returnTool)
-					waitForEquipped(char, returnTool, 1.2)
-				end)
+				hum:EquipTool(returnTool)
+				waitForEquipped(char, returnTool, 1.2)
 			end
 		end
 	end
@@ -553,6 +592,9 @@ local function applyInitialState()
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
 	WeaponInput.Text = preferredWeaponName
+	if preferredWeaponName ~= "" then
+		WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	end
 
 	if speedBoost then
 		applySpeed()
@@ -573,7 +615,40 @@ applyInitialState()
 
 WeaponInput.FocusLost:Connect(function()
 	preferredWeaponName = WeaponInput.Text
+	if preferredWeaponName ~= "" then
+		WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	else
+		WeaponLabel.Text = "🎯 Vũ khí:"
+	end
 	persistState()
+end)
+
+WeaponSelectButton.MouseButton1Click:Connect(function()
+	local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+	if not tool then
+		for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do
+			if v:IsA("Tool") and not isHealTool(v) then
+				tool = v
+				break
+			end
+		end
+	end
+
+	if setPreferredWeapon(tool) then
+		WeaponSelectButton.Text = "🎯 Đã lưu"
+		task.delay(0.8, function()
+			if WeaponSelectButton then
+				WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+			end
+		end)
+	else
+		WeaponSelectButton.Text = "❌ Không thấy"
+		task.delay(0.8, function()
+			if WeaponSelectButton then
+				WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+			end
+		end)
+	end
 end)
 
 game:BindToClose(function()
