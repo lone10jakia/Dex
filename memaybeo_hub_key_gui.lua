@@ -414,6 +414,7 @@ end)
 btnHop.MouseButton1Click:Connect(function()
 	local gameId = game.PlaceId
 	local best
+	local bestPlayers = math.huge
 	local cursor = ""
 	while true do
 		local url = "https://games.roblox.com/v1/games/" .. gameId .. "/servers/Public?limit=100&cursor=" .. cursor
@@ -424,13 +425,12 @@ btnHop.MouseButton1Click:Connect(function()
 			break
 		end
 		for _, srv in ipairs(data.data) do
-			if srv.id ~= game.JobId then
-				best = srv.id
-				break
+			if srv.id ~= game.JobId and srv.playing and srv.maxPlayers then
+				if srv.playing < srv.maxPlayers and srv.playing < bestPlayers then
+					best = srv.id
+					bestPlayers = srv.playing
+				end
 			end
-		end
-		if best then
-			break
 		end
 		cursor = data.nextPageCursor
 		if not cursor then
