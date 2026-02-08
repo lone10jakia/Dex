@@ -539,10 +539,8 @@ task.spawn(function()
 			local preferred = findToolByName(preferredWeaponName)
 			local returnTool = preferred or old
 			if returnTool then
-				task.defer(function()
-					hum:EquipTool(returnTool)
-					waitForEquipped(char, returnTool, 1.2)
-				end)
+				hum:EquipTool(returnTool)
+				waitForEquipped(char, returnTool, 1.2)
 			end
 		end
 	end
