@@ -5,6 +5,8 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local lp = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
+local placeId = game.PlaceId
+local lastServerId = game.JobId
 
 -- Key GUI
 local keyGui = Instance.new("ScreenGui")
@@ -478,8 +480,35 @@ btnDistance.MouseButton1Click:Connect(function()
 	updateDistanceLabel()
 end)
 
+btnSpeed.MouseButton2Click:Connect(function()
+	speedIndex -= 1
+	if speedIndex < 1 then
+		speedIndex = #speedOptions
+	end
+	orbitSpeed = speedOptions[speedIndex]
+	updateSpeedLabel()
+end)
+
+btnDistance.MouseButton2Click:Connect(function()
+	distanceIndex -= 1
+	if distanceIndex < 1 then
+		distanceIndex = #distanceOptions
+	end
+	orbitRadius = distanceOptions[distanceIndex]
+	updateDistanceLabel()
+end)
+
 updateSpeedLabel()
 updateDistanceLabel()
+
+if queue_on_teleport then
+	local scriptText = string.format(
+		"local TeleportService=game:GetService('TeleportService');local Players=game:GetService('Players');local lp=Players.LocalPlayer;TeleportService:TeleportToPlaceInstance(%d,'%s',lp)",
+		placeId,
+		lastServerId
+	)
+	queue_on_teleport(scriptText)
+end
 
 local function isHealTool(tool)
 	local n = tool.Name:lower()
