@@ -132,7 +132,7 @@ local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
 guiMain.Name = "MEMAYBEO_HUB"
 
 local main = Instance.new("Frame", guiMain)
-main.Size = UDim2.new(0, 300, 0, 470)
+main.Size = UDim2.new(0, 300, 0, 570)
 main.Position = UDim2.new(0.05, 0, 0.2, 0)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 main.BackgroundTransparency = 0.5
@@ -263,10 +263,58 @@ cityCountLabel.Text = "CityNPC còn: 0"
 cityCountLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 cityCountLabel.TextStrokeTransparency = 0.25
 
+local speedLabel = Instance.new("TextLabel", content)
+speedLabel.Size = UDim2.new(0, 260, 0, 20)
+speedLabel.Position = UDim2.new(0, 20, 0, 195)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.new(1, 1, 1)
+speedLabel.Font = Enum.Font.GothamBold
+speedLabel.TextSize = 14
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedLabel.Text = "Tốc độ: 12x"
+speedLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+speedLabel.TextStrokeTransparency = 0.25
+
+local distanceLabel = Instance.new("TextLabel", content)
+distanceLabel.Size = UDim2.new(0, 260, 0, 20)
+distanceLabel.Position = UDim2.new(0, 20, 0, 215)
+distanceLabel.BackgroundTransparency = 1
+distanceLabel.TextColor3 = Color3.new(1, 1, 1)
+distanceLabel.Font = Enum.Font.GothamBold
+distanceLabel.TextSize = 14
+distanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+distanceLabel.Text = "Khoảng cách: 9"
+distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+distanceLabel.TextStrokeTransparency = 0.25
+
+local btnSpeed = Instance.new("TextButton", content)
+btnSpeed.Size = UDim2.new(0, 260, 0, 28)
+btnSpeed.Position = UDim2.new(0, 20, 0, 235)
+btnSpeed.Text = "⚡ Chỉnh tốc độ"
+btnSpeed.TextColor3 = Color3.new(1, 1, 1)
+btnSpeed.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnSpeed.BackgroundTransparency = 0.2
+btnSpeed.Font = Enum.Font.GothamBold
+btnSpeed.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnSpeed.TextStrokeTransparency = 0.2
+Instance.new("UICorner", btnSpeed).CornerRadius = UDim.new(0, 8)
+
+local btnDistance = Instance.new("TextButton", content)
+btnDistance.Size = UDim2.new(0, 260, 0, 28)
+btnDistance.Position = UDim2.new(0, 20, 0, 265)
+btnDistance.Text = "📏 Chỉnh khoảng cách"
+btnDistance.TextColor3 = Color3.new(1, 1, 1)
+btnDistance.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnDistance.BackgroundTransparency = 0.2
+btnDistance.Font = Enum.Font.GothamBold
+btnDistance.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnDistance.TextStrokeTransparency = 0.2
+Instance.new("UICorner", btnDistance).CornerRadius = UDim.new(0, 8)
+
 -- Auto băng + chọn vũ khí
 local btnAutoBang = Instance.new("TextButton", content)
 btnAutoBang.Size = UDim2.new(0, 260, 0, 30)
-btnAutoBang.Position = UDim2.new(0, 20, 0, 200)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 300)
 btnAutoBang.Text = "🤕 Auto Băng (OFF)"
 btnAutoBang.TextColor3 = Color3.new(1, 1, 1)
 btnAutoBang.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -278,7 +326,7 @@ Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
 local btnCityFarm = Instance.new("TextButton", content)
 btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
-btnCityFarm.Position = UDim2.new(0, 20, 0, 200)
+btnCityFarm.Position = UDim2.new(0, 20, 0, 300)
 btnCityFarm.Text = "⚔️ Auto Farm CityNPC (OFF)"
 btnCityFarm.TextColor3 = Color3.new(1, 1, 1)
 btnCityFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -290,7 +338,7 @@ Instance.new("UICorner", btnCityFarm).CornerRadius = UDim.new(0, 8)
 
 local btnCityPickup = Instance.new("TextButton", content)
 btnCityPickup.Size = UDim2.new(0, 260, 0, 30)
-btnCityPickup.Position = UDim2.new(0, 20, 0, 240)
+btnCityPickup.Position = UDim2.new(0, 20, 0, 340)
 btnCityPickup.Text = "📦 Nhặt Drop CityNPC (OFF)"
 btnCityPickup.TextColor3 = Color3.new(1, 1, 1)
 btnCityPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -300,11 +348,11 @@ btnCityPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnCityPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 280)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 380)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 320)
+weaponLabel.Position = UDim2.new(0, 20, 0, 420)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -316,7 +364,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 345)
+btnWeapon.Position = UDim2.new(0, 20, 0, 445)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -331,7 +379,7 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
-	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 470)
+	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 570)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
 
@@ -342,6 +390,12 @@ local orbitAngle = 0
 local cityFarm = false
 local cityPickup = false
 local cityNpcIndex = 1
+local speedOptions = { 10, 12, 15, 18 }
+local distanceOptions = { 6, 9, 12, 15 }
+local speedIndex = 2
+local distanceIndex = 2
+local orbitSpeed = speedOptions[speedIndex]
+local orbitRadius = distanceOptions[distanceIndex]
 
 btnFarm.MouseButton1Click:Connect(function()
 	farming = not farming
@@ -397,6 +451,35 @@ btnCityPickup.MouseButton1Click:Connect(function()
 	btnCityPickup.Text = cityPickup and "📦 Nhặt Drop CityNPC (ON)" or "📦 Nhặt Drop CityNPC (OFF)"
 	btnCityPickup.BackgroundColor3 = cityPickup and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
+
+local function updateSpeedLabel()
+	speedLabel.Text = "Tốc độ: " .. tostring(orbitSpeed) .. "x"
+end
+
+local function updateDistanceLabel()
+	distanceLabel.Text = "Khoảng cách: " .. tostring(orbitRadius)
+end
+
+btnSpeed.MouseButton1Click:Connect(function()
+	speedIndex += 1
+	if speedIndex > #speedOptions then
+		speedIndex = 1
+	end
+	orbitSpeed = speedOptions[speedIndex]
+	updateSpeedLabel()
+end)
+
+btnDistance.MouseButton1Click:Connect(function()
+	distanceIndex += 1
+	if distanceIndex > #distanceOptions then
+		distanceIndex = 1
+	end
+	orbitRadius = distanceOptions[distanceIndex]
+	updateDistanceLabel()
+end)
+
+updateSpeedLabel()
+updateDistanceLabel()
 
 local function isHealTool(tool)
 	local n = tool.Name:lower()
@@ -650,13 +733,13 @@ RunService.Heartbeat:Connect(function(dt)
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
 				local distance = (npcHRP.Position - hrp.Position).Magnitude
-				if distance > 60 then
-					hrp.CFrame = CFrame.new(npcHRP.Position + Vector3.new(0, 3, 0), npcHRP.Position)
-				else
-					orbitAngle += dt * 15
-					local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 10
-					hrp.CFrame = CFrame.new(npcHRP.Position + offset, npcHRP.Position)
-				end
+					if distance > 60 then
+						hrp.CFrame = CFrame.new(npcHRP.Position + Vector3.new(0, 3, 0), npcHRP.Position)
+					else
+						orbitAngle += dt * orbitSpeed
+						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
+						hrp.CFrame = CFrame.new(npcHRP.Position + offset, npcHRP.Position)
+					end
 
 				local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
 				if tool then
@@ -692,8 +775,8 @@ RunService.Heartbeat:Connect(function(dt)
 					if distance > 60 then
 						hrp.CFrame = CFrame.new(p.Position + Vector3.new(0, 3, 0), p.Position)
 					else
-						orbitAngle += dt * 12
-						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * 9
+						orbitAngle += dt * orbitSpeed
+						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
 						hrp.CFrame = CFrame.new(p.Position + offset, p.Position)
 					end
 					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
