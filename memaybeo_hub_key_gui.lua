@@ -104,7 +104,7 @@ Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 -- Keys
 local KEY_FREE = "free123"
 local KEY_VIP = "vip123"
-local KEY_URL = "https://mwmaksjzj-1.onrender.com/admin/create"
+local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local Valid = false
 
 local function fetchWebKey()
