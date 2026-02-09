@@ -458,6 +458,7 @@ local function syncPreferredWeaponFromTool(tool)
 	WeaponInput.Text = preferredWeaponName
 	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+	return true
 end
 
 local function setPreferredWeapon(tool)
@@ -492,6 +493,14 @@ task.spawn(function()
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			if not hum or hum.Health >= autoBangThreshold then
+				local currentTool = char:FindFirstChildOfClass("Tool")
+				if currentTool and isHealTool(currentTool) and hum and hum.Health >= hum.MaxHealth then
+					local preferred = findToolByName(preferredWeaponName)
+					if preferred then
+						hum:EquipTool(preferred)
+						waitForEquipped(char, preferred, 1)
+					end
+				end
 				continue
 			end
 

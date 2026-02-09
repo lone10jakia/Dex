@@ -63,6 +63,18 @@ info.TextWrapped = true
 info.TextStrokeColor3 = Color3.new(0, 0, 0)
 info.TextStrokeTransparency = 0.4
 
+local timeInfo = Instance.new("TextLabel", Frame)
+timeInfo.Size = UDim2.new(1, -20, 0, 20)
+timeInfo.Position = UDim2.new(0, 10, 0, 78)
+timeInfo.BackgroundTransparency = 1
+timeInfo.Text = "Hạn key: --"
+timeInfo.TextColor3 = Color3.fromRGB(220, 220, 220)
+timeInfo.Font = Enum.Font.Gotham
+timeInfo.TextSize = 14
+timeInfo.TextXAlignment = Enum.TextXAlignment.Left
+timeInfo.TextStrokeColor3 = Color3.new(0, 0, 0)
+timeInfo.TextStrokeTransparency = 0.4
+
 -- Input box
 local box = Instance.new("TextBox", Frame)
 box.Size = UDim2.new(0.85, 0, 0, 40)
@@ -92,11 +104,61 @@ Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 -- Keys
 local KEY_FREE = "free123"
 local KEY_VIP = "vip123"
+local KEY_URL = "https://mwmaksjzj-1.onrender.com/admin/create"
 local Valid = false
+
+local function fetchWebKey()
+	local ok, res = pcall(function()
+		return game:HttpGet(KEY_URL)
+	end)
+	if not ok or not res or res == "" then
+		return nil
+	end
+	local okDecode, decoded = pcall(HttpService.JSONDecode, HttpService, res)
+	if not okDecode or type(decoded) ~= "table" then
+		return nil
+	end
+	return decoded
+end
+
+local function formatExpiry(ts)
+	if not ts then
+		return "--"
+	end
+	return os.date("%d/%m/%Y %H:%M:%S", ts)
+end
+
+local function updateWebExpiryLabel()
+	local data = fetchWebKey()
+	if not data then
+		return
+	end
+	local expiresAt = tonumber(data.expires_at or data.expiresAt or data.expireAt)
+	if expiresAt then
+		timeInfo.Text = "Hạn key: " .. formatExpiry(expiresAt)
+	end
+end
+
+local function isKeyValidFromWeb(inputKey)
+	local data = fetchWebKey()
+	if not data then
+		return false
+	end
+	local webKey = tostring(data.key or data.Key or "")
+	if webKey == "" or inputKey ~= webKey then
+		return false
+	end
+	local expiresAt = tonumber(data.expires_at or data.expiresAt or data.expireAt)
+	if expiresAt and os.time() > expiresAt then
+		return false
+	end
+	return true
+end
 
 confirm.MouseButton1Click:Connect(function()
 	local k = tostring(box.Text)
-	if k == KEY_FREE or k == KEY_VIP then
+	updateWebExpiryLabel()
+	if k == KEY_FREE or k == KEY_VIP or isKeyValidFromWeb(k) then
 		Valid = true
 		keyGui:Destroy()
 	else
