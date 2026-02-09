@@ -458,6 +458,7 @@ local function syncPreferredWeaponFromTool(tool)
 	WeaponInput.Text = preferredWeaponName
 	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+	return true
 end
 
 local function setPreferredWeapon(tool)
