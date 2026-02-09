@@ -458,19 +458,6 @@ local function syncPreferredWeaponFromTool(tool)
 	WeaponInput.Text = preferredWeaponName
 	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
-	return true
-end
-
-local function setPreferredWeapon(tool)
-	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
-		return false
-	end
-
-	preferredWeaponName = tool.Name
-	WeaponInput.Text = preferredWeaponName
-	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
-	persistState()
-	return true
 end
 
 local function setPreferredWeapon(tool)
@@ -498,6 +485,18 @@ end
 
 local lastHealAt = 0
 local healingInProgress = false
+local lastForceEquipAt = 0
+
+local function forcePreferredWeapon(char, hum)
+	if not char or not hum then
+		return
+	end
+	local preferred = findToolByName(preferredWeaponName)
+	if preferred then
+		hum:EquipTool(preferred)
+		waitForEquipped(char, preferred, 1.2)
+	end
+end
 
 task.spawn(function()
 	while task.wait(0.2) do
@@ -507,10 +506,10 @@ task.spawn(function()
 			if not hum or hum.Health >= autoBangThreshold then
 				local currentTool = char:FindFirstChildOfClass("Tool")
 				if currentTool and isHealTool(currentTool) and hum and hum.Health >= hum.MaxHealth then
-					local preferred = findToolByName(preferredWeaponName)
-					if preferred then
-						hum:EquipTool(preferred)
-						waitForEquipped(char, preferred, 1)
+					if os.clock() - lastForceEquipAt > 0.5 then
+						lastForceEquipAt = os.clock()
+						currentTool.Parent = LocalPlayer.Backpack
+						forcePreferredWeapon(char, hum)
 					end
 				end
 				continue
@@ -562,6 +561,11 @@ task.spawn(function()
 			if returnTool then
 				hum:EquipTool(returnTool)
 				waitForEquipped(char, returnTool, 1.2)
+			end
+			local equipped = char:FindFirstChildOfClass("Tool")
+			if equipped and isHealTool(equipped) then
+				equipped.Parent = LocalPlayer.Backpack
+				forcePreferredWeapon(char, hum)
 			end
 		end
 	end

@@ -105,20 +105,86 @@ Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 local KEY_FREE = "free123"
 local KEY_VIP = "vip123"
 local KEY_URL = "https://mwmaksjzj-1.onrender.com"
+local KEY_ENDPOINTS = {
+	KEY_URL,
+	KEY_URL .. "/key/",
+	KEY_URL .. "/validate",
+	KEY_URL .. "/api/validate",
+	KEY_URL .. "/check",
+	KEY_URL .. "/api/check",
+}
 local Valid = false
 
-local function fetchWebKey()
-	local ok, res = pcall(function()
-		return game:HttpGet(KEY_URL)
-	end)
-	if not ok or not res or res == "" then
+local function parseExpiry(value)
+	if not value then
 		return nil
 	end
-	local okDecode, decoded = pcall(HttpService.JSONDecode, HttpService, res)
+	if type(value) == "number" then
+		return value
+	end
+	local asNumber = tonumber(value)
+	if asNumber then
+		return asNumber
+	end
+	if type(value) == "string" then
+		local y, mo, d, h, mi, s = value:match("^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)")
+		if y and mo and d then
+			return os.time({
+				year = tonumber(y),
+				month = tonumber(mo),
+				day = tonumber(d),
+				hour = tonumber(h) or 0,
+				min = tonumber(mi) or 0,
+				sec = tonumber(s) or 0,
+			})
+		end
+		local okDate, dateTime = pcall(function()
+			return DateTime.fromIsoDateTime(value)
+		end)
+		if okDate and dateTime then
+			return dateTime.UnixTimestamp
+		end
+	end
+	return nil
+end
+
+local function normalizeKeyData(raw)
+	if type(raw) == "table" then
+		return raw
+	end
+	if raw == nil then
+		return nil
+	end
+	local text = tostring(raw):gsub("^%s+", ""):gsub("%s+$", "")
+	if text == "" or text:lower() == "forbidden" then
+		return nil
+	end
+	local okDecode, decoded = pcall(HttpService.JSONDecode, HttpService, text)
 	if okDecode and type(decoded) == "table" then
 		return decoded
 	end
-	return { key = tostring(res) }
+	return { key = text }
+end
+
+local function fetchWebKeyWithInput(inputKey)
+	for _, endpoint in ipairs(KEY_ENDPOINTS) do
+		local url = endpoint
+		if endpoint:sub(-1) == "/" then
+			url = endpoint .. HttpService:UrlEncode(inputKey)
+		elseif endpoint:find("validate") or endpoint:find("check") then
+			url = endpoint .. "?key=" .. HttpService:UrlEncode(inputKey)
+		end
+		local ok, res = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if ok and res and res ~= "" then
+			local normalized = normalizeKeyData(res)
+			if normalized then
+				return normalized
+			end
+		end
+	end
+	return nil
 end
 
 local function formatExpiry(ts)
@@ -129,26 +195,39 @@ local function formatExpiry(ts)
 end
 
 local function updateWebExpiryLabel()
-	local data = fetchWebKey()
+	local data = fetchWebKeyWithInput(box.Text)
 	if not data then
 		return
 	end
-	local expiresAt = tonumber(data.expires_at or data.expiresAt or data.expireAt)
+	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt)
 	if expiresAt then
 		timeInfo.Text = "Hạn key: " .. formatExpiry(expiresAt)
 	end
 end
 
 local function isKeyValidFromWeb(inputKey)
-	local data = fetchWebKey()
+	local data = fetchWebKeyWithInput(inputKey)
 	if not data then
 		return false
 	end
-	local webKey = tostring(data.key or data.Key or "")
-	if webKey == "" or inputKey ~= webKey then
-		return false
+	local webKey = tostring(data.key or data.Key or data.accessKey or "")
+	if webKey ~= "" and inputKey ~= webKey then
+		if type(data.keys) == "table" then
+			local found = false
+			for _, entry in ipairs(data.keys) do
+				if tostring(entry) == inputKey then
+					found = true
+					break
+				end
+			end
+			if not found then
+				return false
+			end
+		elseif not tostring(data):find(inputKey, 1, true) then
+			return false
+		end
 	end
-	local expiresAt = tonumber(data.expires_at or data.expiresAt or data.expireAt)
+	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt)
 	if expiresAt and os.time() > expiresAt then
 		return false
 	end
