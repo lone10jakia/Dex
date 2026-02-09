@@ -458,6 +458,19 @@ local function syncPreferredWeaponFromTool(tool)
 	WeaponInput.Text = preferredWeaponName
 	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+	return true
+end
+
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
 end
 
 local function setPreferredWeapon(tool)
