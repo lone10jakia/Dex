@@ -104,7 +104,7 @@ Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 -- Keys
 local KEY_FREE = "free123"
 local KEY_VIP = "vip123"
-local KEY_URL = "https://mwmaksjzj-1.onrender.com/admin/create"
+local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local Valid = false
 
 local function fetchWebKey()
@@ -115,10 +115,10 @@ local function fetchWebKey()
 		return nil
 	end
 	local okDecode, decoded = pcall(HttpService.JSONDecode, HttpService, res)
-	if not okDecode or type(decoded) ~= "table" then
-		return nil
+	if okDecode and type(decoded) == "table" then
+		return decoded
 	end
-	return decoded
+	return { key = tostring(res) }
 end
 
 local function formatExpiry(ts)
