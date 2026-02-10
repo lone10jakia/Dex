@@ -574,6 +574,13 @@ end)
 LocalPlayer.CharacterAdded:Connect(function(char)
 	char.ChildAdded:Connect(function(child)
 		syncPreferredWeaponFromTool(child)
+		if autoBang and child:IsA("Tool") and isHealTool(child) then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health >= hum.MaxHealth then
+				child.Parent = LocalPlayer.Backpack
+				forcePreferredWeapon(char, hum)
+			end
+		end
 	end)
 
 	if stunActive then

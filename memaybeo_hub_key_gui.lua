@@ -105,13 +105,18 @@ Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 local KEY_FREE = "free123"
 local KEY_VIP = "vip123"
 local KEY_URL = "https://mwmaksjzj-1.onrender.com"
+local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
+	KEY_VALIDATE,
 	KEY_URL,
 	KEY_URL .. "/key/",
+	KEY_URL .. "/keys/",
 	KEY_URL .. "/validate",
 	KEY_URL .. "/api/validate",
 	KEY_URL .. "/check",
 	KEY_URL .. "/api/check",
+	KEY_URL .. "/verify",
+	KEY_URL .. "/api/verify",
 }
 local Valid = false
 
@@ -148,6 +153,16 @@ local function parseExpiry(value)
 	return nil
 end
 
+local function getDeviceFingerprint()
+	local ok, id = pcall(function()
+		return game:GetService("RbxAnalyticsService"):GetClientId()
+	end)
+	if ok and id and id ~= "" then
+		return tostring(id)
+	end
+	return tostring(lp.UserId)
+end
+
 local function normalizeKeyData(raw)
 	if type(raw) == "table" then
 		return raw
@@ -166,20 +181,44 @@ local function normalizeKeyData(raw)
 	return { key = text }
 end
 
+local function requestKeyData(url)
+	local ok, res = pcall(function()
+		return HttpService:RequestAsync({
+			Url = url,
+			Method = "GET",
+			Headers = {
+				["Accept"] = "application/json,text/plain,*/*",
+			},
+		})
+	end)
+	if not ok or not res then
+		return nil
+	end
+	return res
+end
+
 local function fetchWebKeyWithInput(inputKey)
+	local fp = HttpService:UrlEncode(getDeviceFingerprint())
 	for _, endpoint in ipairs(KEY_ENDPOINTS) do
 		local url = endpoint
 		if endpoint:sub(-1) == "/" then
 			url = endpoint .. HttpService:UrlEncode(inputKey)
+			if endpoint:find("validate") then
+				url = url .. "?fp=" .. fp
+			end
 		elseif endpoint:find("validate") or endpoint:find("check") then
+			url = endpoint .. "?key=" .. HttpService:UrlEncode(inputKey) .. "&fp=" .. fp
+		elseif endpoint:find("verify") then
 			url = endpoint .. "?key=" .. HttpService:UrlEncode(inputKey)
 		end
-		local ok, res = pcall(function()
-			return game:HttpGet(url)
-		end)
-		if ok and res and res ~= "" then
-			local normalized = normalizeKeyData(res)
+		local response = requestKeyData(url)
+		if response and response.Success and response.StatusCode >= 200 and response.StatusCode < 300 then
+			if response.Body == "" or response.Body == nil then
+				return { valid = true, _status = response.StatusCode }
+			end
+			local normalized = normalizeKeyData(response.Body)
 			if normalized then
+				normalized._status = response.StatusCode
 				return normalized
 			end
 		end
@@ -199,7 +238,7 @@ local function updateWebExpiryLabel()
 	if not data then
 		return
 	end
-	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt)
+	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt then
 		timeInfo.Text = "Hạn key: " .. formatExpiry(expiresAt)
 	end
@@ -208,6 +247,12 @@ end
 local function isKeyValidFromWeb(inputKey)
 	local data = fetchWebKeyWithInput(inputKey)
 	if not data then
+		return false
+	end
+	if data.ok == true or data.valid == true or data.success == true then
+		return true
+	end
+	if data.ok == false or data.valid == false or data.success == false then
 		return false
 	end
 	local webKey = tostring(data.key or data.Key or data.accessKey or "")
@@ -227,7 +272,7 @@ local function isKeyValidFromWeb(inputKey)
 			return false
 		end
 	end
-	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt)
+	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt and os.time() > expiresAt then
 		return false
 	end
