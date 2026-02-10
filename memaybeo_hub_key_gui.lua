@@ -122,6 +122,8 @@ local KEY_ENDPOINTS = {
 	KEY_VALIDATE,
 }
 local Valid = false
+local keyExpiryDisplay = "Hạn key: --"
+local keyTimeMain
 
 local function sanitizeKey(text)
 	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -255,6 +257,9 @@ end
 task.spawn(function()
 	while keyGui.Parent do
 		clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
+		if keyTimeMain and keyTimeMain.Parent then
+			keyTimeMain.Text = keyExpiryDisplay
+		end
 		task.wait(1)
 	end
 end)
@@ -266,7 +271,8 @@ local function updateWebExpiryLabel()
 	end
 	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt then
-		timeInfo.Text = "Hạn key: " .. formatExpiry(expiresAt)
+		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
+		timeInfo.Text = keyExpiryDisplay
 	end
 end
 
@@ -305,6 +311,11 @@ local function isKeyValidFromWeb(inputKey)
 	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt and os.time() > expiresAt then
 		return false
+	end
+	if expiresAt then
+		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
+	else
+		keyExpiryDisplay = "Hạn key: Không giới hạn"
 	end
 	return true
 end
@@ -384,6 +395,18 @@ title2.Font = Enum.Font.GothamBlack
 title2.TextSize = 18
 title2.TextStrokeColor3 = Color3.new(0, 0, 0)
 title2.TextStrokeTransparency = 0.2
+
+keyTimeMain = Instance.new("TextLabel", main)
+keyTimeMain.Size = UDim2.new(1, -20, 0, 16)
+keyTimeMain.Position = UDim2.new(0, 10, 1, -20)
+keyTimeMain.BackgroundTransparency = 1
+keyTimeMain.Text = keyExpiryDisplay
+keyTimeMain.TextColor3 = Color3.fromRGB(220, 220, 220)
+keyTimeMain.Font = Enum.Font.Gotham
+keyTimeMain.TextSize = 12
+keyTimeMain.TextXAlignment = Enum.TextXAlignment.Left
+keyTimeMain.TextStrokeColor3 = Color3.new(0, 0, 0)
+keyTimeMain.TextStrokeTransparency = 0.4
 
 -- Collapse button
 local collapseBtn = Instance.new("TextButton", main)
@@ -597,6 +620,7 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
+	keyTimeMain.Visible = not collapsed
 	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 570)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
