@@ -120,7 +120,6 @@ local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
 	KEY_VALIDATE,
-	KEY_URL .. "/api/validate/",
 }
 local Valid = false
 
@@ -202,6 +201,10 @@ local function requestKeyData(url)
 			},
 		})
 	end)
+	if ok and res then
+		return res
+	end
+
 	if not ok or not res then
 		local okGet, body = pcall(function()
 			return game:HttpGet(url)
@@ -215,7 +218,8 @@ local function requestKeyData(url)
 		end
 		return nil
 	end
-	return res
+
+	return nil
 end
 
 local function fetchWebKeyWithInput(inputKey)
@@ -224,16 +228,19 @@ local function fetchWebKeyWithInput(inputKey)
 		return nil
 	end
 	local fp = HttpService:UrlEncode(getDeviceFingerprint())
-	for _, endpoint in ipairs(KEY_ENDPOINTS) do
-		local url = endpoint .. HttpService:UrlEncode(cleanKey) .. "?fp=" .. fp
-		local response = requestKeyData(url)
-		if response and response.Success and response.StatusCode >= 200 and response.StatusCode < 300 then
-			local normalized = normalizeKeyData(response.Body)
-			if normalized then
-				normalized._status = response.StatusCode
-				return normalized
+	for _ = 1, 2 do
+		for _, endpoint in ipairs(KEY_ENDPOINTS) do
+			local url = endpoint .. HttpService:UrlEncode(cleanKey) .. "?fp=" .. fp
+			local response = requestKeyData(url)
+			if response and response.Body then
+				local normalized = normalizeKeyData(response.Body)
+				if normalized then
+					normalized._status = response.StatusCode
+					return normalized
+				end
 			end
 		end
+		task.wait(0.25)
 	end
 	return nil
 end
@@ -271,6 +278,9 @@ local function isKeyValidFromWeb(inputKey)
 	end
 	if data.ok == true or data.valid == true or data.success == true then
 		return true
+	end
+	if type(data.message) == "string" then
+		timeInfo.Text = "Web: " .. data.message
 	end
 	if data.ok == false or data.valid == false or data.success == false then
 		return false
