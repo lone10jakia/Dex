@@ -50,10 +50,22 @@ title.TextSize = 22
 title.TextStrokeColor3 = Color3.new(0, 0, 0)
 title.TextStrokeTransparency = 0.2
 
+local clockInfo = Instance.new("TextLabel", Frame)
+clockInfo.Size = UDim2.new(1, -20, 0, 16)
+clockInfo.Position = UDim2.new(0, 10, 0, 32)
+clockInfo.BackgroundTransparency = 1
+clockInfo.Text = "Giờ hiện tại: --"
+clockInfo.TextColor3 = Color3.fromRGB(220, 220, 220)
+clockInfo.Font = Enum.Font.Gotham
+clockInfo.TextSize = 13
+clockInfo.TextXAlignment = Enum.TextXAlignment.Left
+clockInfo.TextStrokeColor3 = Color3.new(0, 0, 0)
+clockInfo.TextStrokeTransparency = 0.4
+
 -- Info
 local info = Instance.new("TextLabel", Frame)
 info.Size = UDim2.new(1, -20, 0, 40)
-info.Position = UDim2.new(0, 10, 0, 40)
+info.Position = UDim2.new(0, 10, 0, 50)
 info.BackgroundTransparency = 1
 info.Text = "Mua key VIP ib TikTok: memaybeohub"
 info.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -65,7 +77,7 @@ info.TextStrokeTransparency = 0.4
 
 local timeInfo = Instance.new("TextLabel", Frame)
 timeInfo.Size = UDim2.new(1, -20, 0, 20)
-timeInfo.Position = UDim2.new(0, 10, 0, 78)
+timeInfo.Position = UDim2.new(0, 10, 0, 85)
 timeInfo.BackgroundTransparency = 1
 timeInfo.Text = "Hạn key: --"
 timeInfo.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -78,7 +90,7 @@ timeInfo.TextStrokeTransparency = 0.4
 -- Input box
 local box = Instance.new("TextBox", Frame)
 box.Size = UDim2.new(0.85, 0, 0, 40)
-box.Position = UDim2.new(0.075, 0, 0, 95)
+box.Position = UDim2.new(0.075, 0, 0, 108)
 box.PlaceholderText = "Nhập key..."
 box.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 box.BackgroundTransparency = 0.3
@@ -91,7 +103,7 @@ Instance.new("UICorner", box).CornerRadius = UDim.new(0, 12)
 -- Confirm button
 local confirm = Instance.new("TextButton", Frame)
 confirm.Size = UDim2.new(0.55, 0, 0, 40)
-confirm.Position = UDim2.new(0.225, 0, 0, 150)
+confirm.Position = UDim2.new(0.225, 0, 0, 160)
 confirm.Text = "Xác nhận"
 confirm.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 confirm.TextColor3 = Color3.new(1, 1, 1)
@@ -232,6 +244,13 @@ local function formatExpiry(ts)
 	end
 	return os.date("%d/%m/%Y %H:%M:%S", ts)
 end
+
+task.spawn(function()
+	while keyGui.Parent do
+		clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
+		task.wait(1)
+	end
+end)
 
 local function updateWebExpiryLabel()
 	local data = fetchWebKeyWithInput(sanitizeKey(box.Text))
