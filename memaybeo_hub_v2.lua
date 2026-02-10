@@ -472,6 +472,18 @@ local function setPreferredWeapon(tool)
 	return true
 end
 
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
+end
+
 local function waitForEquipped(char, tool, timeout)
 	local deadline = os.clock() + timeout
 	while os.clock() < deadline do
@@ -486,6 +498,7 @@ end
 local lastHealAt = 0
 local healingInProgress = false
 local lastForceEquipAt = 0
+local postHealForceUntil = 0
 
 local function forcePreferredWeapon(char, hum)
 	if not char or not hum then
@@ -503,6 +516,16 @@ task.spawn(function()
 		if autoBang and LocalPlayer.Character and not healingInProgress then
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health >= hum.MaxHealth and os.clock() < postHealForceUntil then
+				local equipped = char:FindFirstChildOfClass("Tool")
+				if equipped and isHealTool(equipped) then
+					if os.clock() - lastForceEquipAt > 0.2 then
+						lastForceEquipAt = os.clock()
+						equipped.Parent = LocalPlayer.Backpack
+						forcePreferredWeapon(char, hum)
+					end
+				end
+			end
 			if not hum or hum.Health >= autoBangThreshold then
 				local currentTool = char:FindFirstChildOfClass("Tool")
 				if currentTool and isHealTool(currentTool) and hum and hum.Health >= hum.MaxHealth then
@@ -555,6 +578,7 @@ task.spawn(function()
 			end
 			lastHealAt = os.clock()
 			healingInProgress = false
+			postHealForceUntil = os.clock() + 3
 
 			local preferred = findToolByName(preferredWeaponName)
 			local returnTool = preferred or old
