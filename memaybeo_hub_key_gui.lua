@@ -108,17 +108,13 @@ local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
 	KEY_VALIDATE,
-	KEY_URL,
-	KEY_URL .. "/key/",
-	KEY_URL .. "/keys/",
-	KEY_URL .. "/validate",
-	KEY_URL .. "/api/validate",
-	KEY_URL .. "/check",
-	KEY_URL .. "/api/check",
-	KEY_URL .. "/verify",
-	KEY_URL .. "/api/verify",
+	KEY_URL .. "/api/validate/",
 }
 local Valid = false
+
+local function sanitizeKey(text)
+	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
 
 local function parseExpiry(value)
 	if not value then
@@ -174,11 +170,14 @@ local function normalizeKeyData(raw)
 	if text == "" or text:lower() == "forbidden" then
 		return nil
 	end
+	if text:sub(1, 1) ~= "{" then
+		return nil
+	end
 	local okDecode, decoded = pcall(HttpService.JSONDecode, HttpService, text)
 	if okDecode and type(decoded) == "table" then
 		return decoded
 	end
-	return { key = text }
+	return nil
 end
 
 local function requestKeyData(url)
@@ -192,30 +191,31 @@ local function requestKeyData(url)
 		})
 	end)
 	if not ok or not res then
+		local okGet, body = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if okGet and body then
+			return {
+				Success = true,
+				StatusCode = 200,
+				Body = body,
+			}
+		end
 		return nil
 	end
 	return res
 end
 
 local function fetchWebKeyWithInput(inputKey)
+	local cleanKey = sanitizeKey(inputKey)
+	if cleanKey == "" then
+		return nil
+	end
 	local fp = HttpService:UrlEncode(getDeviceFingerprint())
 	for _, endpoint in ipairs(KEY_ENDPOINTS) do
-		local url = endpoint
-		if endpoint:sub(-1) == "/" then
-			url = endpoint .. HttpService:UrlEncode(inputKey)
-			if endpoint:find("validate") then
-				url = url .. "?fp=" .. fp
-			end
-		elseif endpoint:find("validate") or endpoint:find("check") then
-			url = endpoint .. "?key=" .. HttpService:UrlEncode(inputKey) .. "&fp=" .. fp
-		elseif endpoint:find("verify") then
-			url = endpoint .. "?key=" .. HttpService:UrlEncode(inputKey)
-		end
+		local url = endpoint .. HttpService:UrlEncode(cleanKey) .. "?fp=" .. fp
 		local response = requestKeyData(url)
 		if response and response.Success and response.StatusCode >= 200 and response.StatusCode < 300 then
-			if response.Body == "" or response.Body == nil then
-				return { valid = true, _status = response.StatusCode }
-			end
 			local normalized = normalizeKeyData(response.Body)
 			if normalized then
 				normalized._status = response.StatusCode
@@ -234,7 +234,7 @@ local function formatExpiry(ts)
 end
 
 local function updateWebExpiryLabel()
-	local data = fetchWebKeyWithInput(box.Text)
+	local data = fetchWebKeyWithInput(sanitizeKey(box.Text))
 	if not data then
 		return
 	end
@@ -245,7 +245,8 @@ local function updateWebExpiryLabel()
 end
 
 local function isKeyValidFromWeb(inputKey)
-	local data = fetchWebKeyWithInput(inputKey)
+	local cleanKey = sanitizeKey(inputKey)
+	local data = fetchWebKeyWithInput(cleanKey)
 	if not data then
 		return false
 	end
@@ -256,11 +257,11 @@ local function isKeyValidFromWeb(inputKey)
 		return false
 	end
 	local webKey = tostring(data.key or data.Key or data.accessKey or "")
-	if webKey ~= "" and inputKey ~= webKey then
+	if webKey ~= "" and cleanKey ~= webKey then
 		if type(data.keys) == "table" then
 			local found = false
 			for _, entry in ipairs(data.keys) do
-				if tostring(entry) == inputKey then
+				if tostring(entry) == cleanKey then
 					found = true
 					break
 				end
@@ -268,7 +269,7 @@ local function isKeyValidFromWeb(inputKey)
 			if not found then
 				return false
 			end
-		elseif not tostring(data):find(inputKey, 1, true) then
+		elseif not tostring(data):find(cleanKey, 1, true) then
 			return false
 		end
 	end
@@ -280,7 +281,7 @@ local function isKeyValidFromWeb(inputKey)
 end
 
 confirm.MouseButton1Click:Connect(function()
-	local k = tostring(box.Text)
+	local k = sanitizeKey(box.Text)
 	updateWebExpiryLabel()
 	if k == KEY_FREE or k == KEY_VIP or isKeyValidFromWeb(k) then
 		Valid = true
