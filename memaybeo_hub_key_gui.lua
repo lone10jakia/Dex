@@ -123,8 +123,10 @@ local KEY_ENDPOINTS = {
 }
 local Valid = false
 local keyExpiryDisplay = "Hạn key: --"
+local keyExpiryAt = nil
 local keyTimeMain
 local currentTimeMain
+local currentTimeOutside
 
 local function sanitizeKey(text)
 	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -264,6 +266,9 @@ task.spawn(function()
 		if currentTimeMain and currentTimeMain.Parent then
 			currentTimeMain.Text = "Giờ hiện tại: " .. os.date("%H:%M:%S")
 		end
+		if currentTimeOutside and currentTimeOutside.Parent then
+			currentTimeOutside.Text = "🕒 " .. os.date("%H:%M:%S")
+		end
 		task.wait(1)
 	end
 end)
@@ -275,6 +280,7 @@ local function updateWebExpiryLabel()
 	end
 	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt then
+		keyExpiryAt = expiresAt
 		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
 		timeInfo.Text = keyExpiryDisplay
 	end
@@ -317,8 +323,10 @@ local function isKeyValidFromWeb(inputKey)
 		return false
 	end
 	if expiresAt then
+		keyExpiryAt = expiresAt
 		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
 	else
+		keyExpiryAt = nil
 		keyExpiryDisplay = "Hạn key: Không giới hạn"
 	end
 	return true
@@ -339,6 +347,16 @@ confirm.MouseButton1Click:Connect(function()
 	end
 end)
 repeat task.wait() until Valid
+
+task.spawn(function()
+	while true do
+		if keyExpiryAt and os.time() >= keyExpiryAt then
+			lp:Kick("Key đã hết hạn, vui lòng lấy key mới.")
+			break
+		end
+		task.wait(1)
+	end
+end)
 
 -- ====================[ ANTI AFK ]===================
 lp.Idled:Connect(function()
@@ -363,6 +381,19 @@ end)
 -- ====================[ GUI CHÍNH + COLLAPSE ]===================
 local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
 guiMain.Name = "MEMAYBEO_HUB"
+
+currentTimeOutside = Instance.new("TextLabel", guiMain)
+currentTimeOutside.Size = UDim2.new(0, 120, 0, 24)
+currentTimeOutside.Position = UDim2.new(0, 10, 0, 10)
+currentTimeOutside.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+currentTimeOutside.BackgroundTransparency = 0.35
+currentTimeOutside.Text = "🕒 --:--:--"
+currentTimeOutside.TextColor3 = Color3.new(1, 1, 1)
+currentTimeOutside.Font = Enum.Font.GothamBold
+currentTimeOutside.TextSize = 14
+currentTimeOutside.TextStrokeColor3 = Color3.new(0, 0, 0)
+currentTimeOutside.TextStrokeTransparency = 0.35
+Instance.new("UICorner", currentTimeOutside).CornerRadius = UDim.new(0, 8)
 
 local main = Instance.new("Frame", guiMain)
 main.Size = UDim2.new(0, 300, 0, 570)
