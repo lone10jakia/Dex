@@ -127,6 +127,7 @@ local keyExpiryAt = nil
 local keyTimeMain
 local currentTimeMain
 local currentTimeOutside
+local keyTimeOutside
 
 local function sanitizeKey(text)
 	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -250,15 +251,35 @@ local function fetchWebKeyWithInput(inputKey)
 	return nil
 end
 
-local function formatExpiry(ts)
-	if not ts then
-		return "--"
+local function formatCountdown(seconds)
+	if seconds <= 0 then
+		return "00:00:00"
 	end
-	return os.date("%d/%m/%Y %H:%M:%S", ts)
+	local h = math.floor(seconds / 3600)
+	local m = math.floor((seconds % 3600) / 60)
+	local s = seconds % 60
+	return string.format("%02d:%02d:%02d", h, m, s)
+end
+
+local function refreshKeyExpiryDisplay()
+	if keyExpiryAt then
+		local left = keyExpiryAt - os.time()
+		if left <= 0 then
+			keyExpiryDisplay = "Hạn key còn: 00:00:00"
+		else
+			keyExpiryDisplay = "Hạn key còn: " .. formatCountdown(left)
+		end
+	else
+		if keyExpiryDisplay == "Hạn key: --" then
+			return
+		end
+		keyExpiryDisplay = "Hạn key: Không giới hạn"
+	end
 end
 
 task.spawn(function()
 	while keyGui.Parent do
+		refreshKeyExpiryDisplay()
 		clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
 		if keyTimeMain and keyTimeMain.Parent then
 			keyTimeMain.Text = keyExpiryDisplay
@@ -268,6 +289,9 @@ task.spawn(function()
 		end
 		if currentTimeOutside and currentTimeOutside.Parent then
 			currentTimeOutside.Text = "🕒 " .. os.date("%H:%M:%S")
+		end
+		if keyTimeOutside and keyTimeOutside.Parent then
+			keyTimeOutside.Text = keyExpiryDisplay
 		end
 		task.wait(1)
 	end
@@ -281,7 +305,7 @@ local function updateWebExpiryLabel()
 	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt then
 		keyExpiryAt = expiresAt
-		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
+		refreshKeyExpiryDisplay()
 		timeInfo.Text = keyExpiryDisplay
 	end
 end
@@ -291,6 +315,11 @@ local function isKeyValidFromWeb(inputKey)
 	local data = fetchWebKeyWithInput(cleanKey)
 	if not data then
 		return false
+	end
+	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
+	if expiresAt then
+		keyExpiryAt = expiresAt
+		refreshKeyExpiryDisplay()
 	end
 	if data.ok == true or data.valid == true or data.success == true then
 		return true
@@ -318,17 +347,14 @@ local function isKeyValidFromWeb(inputKey)
 			return false
 		end
 	end
-	local expiresAt = parseExpiry(data.expires_at or data.expiresAt or data.expireAt or data.expires)
 	if expiresAt and os.time() > expiresAt then
 		return false
 	end
-	if expiresAt then
-		keyExpiryAt = expiresAt
-		keyExpiryDisplay = "Hạn key: " .. formatExpiry(expiresAt)
-	else
+	if not expiresAt then
 		keyExpiryAt = nil
 		keyExpiryDisplay = "Hạn key: Không giới hạn"
 	end
+	refreshKeyExpiryDisplay()
 	return true
 end
 
@@ -394,6 +420,20 @@ currentTimeOutside.TextSize = 14
 currentTimeOutside.TextStrokeColor3 = Color3.new(0, 0, 0)
 currentTimeOutside.TextStrokeTransparency = 0.35
 Instance.new("UICorner", currentTimeOutside).CornerRadius = UDim.new(0, 8)
+
+keyTimeOutside = Instance.new("TextLabel", guiMain)
+keyTimeOutside.Size = UDim2.new(0, 220, 0, 24)
+keyTimeOutside.Position = UDim2.new(0, 10, 0, 38)
+keyTimeOutside.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+keyTimeOutside.BackgroundTransparency = 0.35
+keyTimeOutside.Text = keyExpiryDisplay
+keyTimeOutside.TextColor3 = Color3.new(1, 1, 1)
+keyTimeOutside.Font = Enum.Font.GothamBold
+keyTimeOutside.TextSize = 13
+keyTimeOutside.TextXAlignment = Enum.TextXAlignment.Left
+keyTimeOutside.TextStrokeColor3 = Color3.new(0, 0, 0)
+keyTimeOutside.TextStrokeTransparency = 0.35
+Instance.new("UICorner", keyTimeOutside).CornerRadius = UDim.new(0, 8)
 
 local main = Instance.new("Frame", guiMain)
 main.Size = UDim2.new(0, 300, 0, 570)
