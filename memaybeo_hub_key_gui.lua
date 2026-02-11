@@ -114,8 +114,6 @@ confirm.TextStrokeTransparency = 0.2
 Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 
 -- Keys
-local KEY_FREE = "free123"
-local KEY_VIP = "vip123"
 local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
@@ -666,7 +664,7 @@ distanceLabel.TextColor3 = Color3.new(1, 1, 1)
 distanceLabel.Font = Enum.Font.GothamBold
 distanceLabel.TextSize = 14
 distanceLabel.TextXAlignment = Enum.TextXAlignment.Left
-distanceLabel.Text = "Khoảng cách: 9"
+distanceLabel.Text = "Khoảng cách: 10"
 distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 distanceLabel.TextStrokeTransparency = 0.25
 
