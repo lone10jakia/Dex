@@ -121,6 +121,7 @@ local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
 	KEY_VALIDATE,
 }
+local SAVED_KEY_FILE = "memaybeo_saved_key.txt"
 local Valid = false
 local keyExpiryDisplay = "Hạn key: --"
 local keyExpiryAt = nil
@@ -132,6 +133,41 @@ local keyTimeOutside
 local function sanitizeKey(text)
 	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
+
+local function loadSavedKey()
+	if not (readfile and isfile) then
+		return ""
+	end
+	if not isfile(SAVED_KEY_FILE) then
+		return ""
+	end
+	local ok, data = pcall(readfile, SAVED_KEY_FILE)
+	if not ok or not data then
+		return ""
+	end
+	return sanitizeKey(data)
+end
+
+local function saveKey(value)
+	if not writefile then
+		return
+	end
+	pcall(function()
+		writefile(SAVED_KEY_FILE, sanitizeKey(value))
+	end)
+end
+
+local function clearSavedKey()
+	if not delfile or not isfile then
+		return
+	end
+	if not isfile(SAVED_KEY_FILE) then
+		return
+	end
+	pcall(delfile, SAVED_KEY_FILE)
+end
+
+box.Text = loadSavedKey()
 
 local function parseExpiry(value)
 	if not value then
@@ -278,9 +314,11 @@ local function refreshKeyExpiryDisplay()
 end
 
 task.spawn(function()
-	while keyGui.Parent do
+	while true do
 		refreshKeyExpiryDisplay()
-		clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
+		if keyGui.Parent then
+			clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
+		end
 		if keyTimeMain and keyTimeMain.Parent then
 			keyTimeMain.Text = keyExpiryDisplay
 		end
@@ -358,10 +396,26 @@ local function isKeyValidFromWeb(inputKey)
 	return true
 end
 
+task.spawn(function()
+	local saved = sanitizeKey(loadSavedKey())
+	if saved == "" then
+		return
+	end
+	box.Text = saved
+	updateWebExpiryLabel()
+	if saved == KEY_FREE or saved == KEY_VIP or isKeyValidFromWeb(saved) then
+		Valid = true
+		keyGui:Destroy()
+	else
+		clearSavedKey()
+	end
+end)
+
 confirm.MouseButton1Click:Connect(function()
 	local k = sanitizeKey(box.Text)
 	updateWebExpiryLabel()
 	if k == KEY_FREE or k == KEY_VIP or isKeyValidFromWeb(k) then
+		saveKey(k)
 		Valid = true
 		keyGui:Destroy()
 	else
@@ -377,6 +431,7 @@ repeat task.wait() until Valid
 task.spawn(function()
 	while true do
 		if keyExpiryAt and os.time() >= keyExpiryAt then
+			clearSavedKey()
 			lp:Kick("Key đã hết hạn, vui lòng lấy key mới.")
 			break
 		end
