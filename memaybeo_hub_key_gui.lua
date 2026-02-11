@@ -582,7 +582,7 @@ Instance.new("UICorner", btnFarm).CornerRadius = UDim.new(0, 8)
 local btnPickup = Instance.new("TextButton", content)
 btnPickup.Size = UDim2.new(0, 260, 0, 30)
 btnPickup.Position = UDim2.new(0, 20, 0, 50)
-btnPickup.Text = "🟢 Auto Nhặt Vật Phẩm (OFF)"
+btnPickup.Text = "🟢 Nhặt Drop GiangHo2 (OFF)"
 btnPickup.TextColor3 = Color3.new(1, 1, 1)
 btnPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btnPickup.BackgroundTransparency = 0.2
@@ -788,7 +788,7 @@ end)
 
 btnPickup.MouseButton1Click:Connect(function()
 	autoPickup = not autoPickup
-	btnPickup.Text = autoPickup and "🟢 Auto Nhặt Vật Phẩm (ON)" or "🟢 Auto Nhặt Vật Phẩm (OFF)"
+	btnPickup.Text = autoPickup and "🟢 Nhặt Drop GiangHo2 (ON)" or "🟢 Nhặt Drop GiangHo2 (OFF)"
 	btnPickup.BackgroundColor3 = autoPickup and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
 
@@ -1162,12 +1162,10 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 
 		if autoPickup then
-			for _, item in ipairs(workspace:GetDescendants()) do
-				if item:IsA("BasePart") and (item.Position - hrp.Position).Magnitude <= 15 then
-					pcall(function()
-						hrp.CFrame = CFrame.new(item.Position)
-					end)
-				end
+			local dropFolder = workspace:FindFirstChild("GiangHo2")
+			dropFolder = dropFolder and dropFolder:FindFirstChild("Drop")
+			if dropFolder then
+				collectDropParts(dropFolder)
 			end
 		end
 
