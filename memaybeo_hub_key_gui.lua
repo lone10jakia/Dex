@@ -124,6 +124,7 @@ local KEY_ENDPOINTS = {
 local Valid = false
 local keyExpiryDisplay = "Hạn key: --"
 local keyTimeMain
+local currentTimeMain
 
 local function sanitizeKey(text)
 	return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -259,6 +260,9 @@ task.spawn(function()
 		clockInfo.Text = "Giờ hiện tại: " .. os.date("%d/%m/%Y %H:%M:%S")
 		if keyTimeMain and keyTimeMain.Parent then
 			keyTimeMain.Text = keyExpiryDisplay
+		end
+		if currentTimeMain and currentTimeMain.Parent then
+			currentTimeMain.Text = "Giờ hiện tại: " .. os.date("%H:%M:%S")
 		end
 		task.wait(1)
 	end
@@ -407,6 +411,18 @@ keyTimeMain.TextSize = 12
 keyTimeMain.TextXAlignment = Enum.TextXAlignment.Left
 keyTimeMain.TextStrokeColor3 = Color3.new(0, 0, 0)
 keyTimeMain.TextStrokeTransparency = 0.4
+
+currentTimeMain = Instance.new("TextLabel", main)
+currentTimeMain.Size = UDim2.new(1, -20, 0, 16)
+currentTimeMain.Position = UDim2.new(0, 10, 1, -36)
+currentTimeMain.BackgroundTransparency = 1
+currentTimeMain.Text = "Giờ hiện tại: --:--:--"
+currentTimeMain.TextColor3 = Color3.fromRGB(220, 220, 220)
+currentTimeMain.Font = Enum.Font.Gotham
+currentTimeMain.TextSize = 12
+currentTimeMain.TextXAlignment = Enum.TextXAlignment.Left
+currentTimeMain.TextStrokeColor3 = Color3.new(0, 0, 0)
+currentTimeMain.TextStrokeTransparency = 0.4
 
 -- Collapse button
 local collapseBtn = Instance.new("TextButton", main)
@@ -620,7 +636,6 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
-	keyTimeMain.Visible = not collapsed
 	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 570)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
