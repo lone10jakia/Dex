@@ -4,10 +4,33 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
+local GuiService = game:GetService("GuiService")
 local lp = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
 local placeId = game.PlaceId
 local lastServerId = game.JobId
+local autoRejoinEnabled = true
+local rejoiningNow = false
+local blockAutoRejoin = false
+
+local function tryAutoRejoin()
+	if not autoRejoinEnabled or rejoiningNow or blockAutoRejoin then
+		return
+	end
+	rejoiningNow = true
+	task.delay(1.5, function()
+		pcall(function()
+			if lastServerId and lastServerId ~= "" then
+				TeleportService:TeleportToPlaceInstance(placeId, lastServerId, lp)
+			else
+				TeleportService:Teleport(placeId, lp)
+			end
+		end)
+		task.delay(8, function()
+			rejoiningNow = false
+		end)
+	end)
+end
 
 -- Key GUI
 local keyGui = Instance.new("ScreenGui")
@@ -432,12 +455,23 @@ repeat task.wait() until Valid
 task.spawn(function()
 	while true do
 		if keyExpiryAt and os.time() >= keyExpiryAt then
+			blockAutoRejoin = true
 			clearSavedKey()
 			lp:Kick("Key đã hết hạn, vui lòng lấy key mới.")
 			break
 		end
 		task.wait(1)
 	end
+end)
+
+GuiService.ErrorMessageChanged:Connect(function(message)
+	if type(message) ~= "string" then
+		return
+	end
+	if message == "" then
+		return
+	end
+	tryAutoRejoin()
 end)
 
 -- ====================[ ANTI AFK ]===================
@@ -492,7 +526,7 @@ keyTimeOutside.TextStrokeTransparency = 0.35
 Instance.new("UICorner", keyTimeOutside).CornerRadius = UDim.new(0, 8)
 
 local main = Instance.new("Frame", guiMain)
-main.Size = UDim2.new(0, 300, 0, 570)
+main.Size = UDim2.new(0, 300, 0, 610)
 main.Position = UDim2.new(0.05, 0, 0.2, 0)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 main.BackgroundTransparency = 0.5
@@ -736,7 +770,7 @@ Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
 local btnCityFarm = Instance.new("TextButton", content)
 btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
-btnCityFarm.Position = UDim2.new(0, 20, 0, 300)
+btnCityFarm.Position = UDim2.new(0, 20, 0, 335)
 btnCityFarm.Text = "⚔️ Auto Farm CityNPC (OFF)"
 btnCityFarm.TextColor3 = Color3.new(1, 1, 1)
 btnCityFarm.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -748,7 +782,7 @@ Instance.new("UICorner", btnCityFarm).CornerRadius = UDim.new(0, 8)
 
 local btnCityPickup = Instance.new("TextButton", content)
 btnCityPickup.Size = UDim2.new(0, 260, 0, 30)
-btnCityPickup.Position = UDim2.new(0, 20, 0, 340)
+btnCityPickup.Position = UDim2.new(0, 20, 0, 372)
 btnCityPickup.Text = "📦 Nhặt Drop CityNPC (OFF)"
 btnCityPickup.TextColor3 = Color3.new(1, 1, 1)
 btnCityPickup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -762,7 +796,7 @@ btnAutoBang.Position = UDim2.new(0, 20, 0, 410)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 450)
+weaponLabel.Position = UDim2.new(0, 20, 0, 448)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -774,7 +808,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 475)
+btnWeapon.Position = UDim2.new(0, 20, 0, 478)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -789,7 +823,7 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
-	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 570)
+	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 610)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
 
@@ -803,6 +837,47 @@ local cityNpcIndex = 1
 local orbitSpeed = 12
 local orbitRadius = 9
 local fixLag = false
+local lagDisabledEmitters = {}
+local lagDisabledTrails = {}
+
+local function applyFixLagState(enabled)
+	if enabled then
+		pcall(function()
+			Lighting.GlobalShadows = false
+			Lighting.FogEnd = 1e10
+			Lighting.Brightness = 1
+			for _, obj in ipairs(workspace:GetDescendants()) do
+				if obj:IsA("ParticleEmitter") and obj.Enabled then
+					lagDisabledEmitters[obj] = true
+					obj.Enabled = false
+				elseif obj:IsA("Trail") and obj.Enabled then
+					lagDisabledTrails[obj] = true
+					obj.Enabled = false
+				elseif obj:IsA("BasePart") then
+					obj.Material = Enum.Material.Plastic
+					obj.Reflectance = 0
+				end
+			end
+		end)
+	else
+		pcall(function()
+			Lighting.GlobalShadows = true
+			Lighting.FogEnd = 100000
+			for emitter in pairs(lagDisabledEmitters) do
+				if emitter and emitter.Parent then
+					emitter.Enabled = true
+				end
+			end
+			for trail in pairs(lagDisabledTrails) do
+				if trail and trail.Parent then
+					trail.Enabled = true
+				end
+			end
+			lagDisabledEmitters = {}
+			lagDisabledTrails = {}
+		end)
+	end
+end
 
 btnFarm.MouseButton1Click:Connect(function()
 	farming = not farming
@@ -888,21 +963,7 @@ btnDistance.MouseButton1Click:Connect(function()
 	fixLag = not fixLag
 	btnDistance.Text = fixLag and "🚀 Fix Lag (ON)" or "🚀 Fix Lag (OFF)"
 	btnDistance.BackgroundColor3 = fixLag and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
-	if fixLag then
-		pcall(function()
-			Lighting.GlobalShadows = false
-			Lighting.FogEnd = 1e10
-			Lighting.Brightness = 1
-			for _, obj in ipairs(workspace:GetDescendants()) do
-				if obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
-					obj.Enabled = false
-				elseif obj:IsA("BasePart") then
-					obj.Material = Enum.Material.Plastic
-					obj.Reflectance = 0
-				end
-			end
-		end)
-	end
+	applyFixLagState(fixLag)
 end)
 
 updateSpeedLabel()
