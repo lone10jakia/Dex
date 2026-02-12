@@ -1113,6 +1113,7 @@ btnAutoBang.MouseButton1Click:Connect(function()
 	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
 
+
 local function applyDefaultToggleState()
 	btnFarm.Text = farming and "🟢 Đang Farm NPC2" or "✅ Auto Farm NPC2"
 	btnFarm.BackgroundColor3 = farming and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
