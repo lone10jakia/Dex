@@ -482,10 +482,19 @@ end)
 
 -- ====================[ NHÂN VẬT ]===================
 local hrp, hum
+local groundRayParams = RaycastParams.new()
+groundRayParams.FilterType = Enum.RaycastFilterType.Blacklist
+groundRayParams.FilterDescendantsInstances = {}
+
+local function updateGroundRayFilter(char)
+	groundRayParams.FilterDescendantsInstances = { char }
+end
+
 local function getChar()
 	local char = lp.Character or lp.CharacterAdded:Wait()
 	hrp = char:WaitForChild("HumanoidRootPart")
 	hum = char:WaitForChild("Humanoid")
+	updateGroundRayFilter(char)
 	return char
 end
 getChar()
@@ -493,6 +502,22 @@ lp.CharacterAdded:Connect(function()
 	task.wait(1)
 	getChar()
 end)
+
+local function getSafeGroundPosition(targetPos)
+	local currentY = hrp and hrp.Position.Y or targetPos.Y
+	local rayOrigin = targetPos + Vector3.new(0, 80, 0)
+	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -240, 0), groundRayParams)
+	local y = targetPos.Y + 3
+	if rayResult then
+		y = rayResult.Position.Y + 4
+	end
+	if y > currentY + 18 then
+		y = currentY + 18
+	elseif y < currentY - 40 then
+		y = currentY - 40
+	end
+	return Vector3.new(targetPos.X, y, targetPos.Z)
+end
 
 -- ====================[ GUI CHÍNH + COLLAPSE ]===================
 local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
@@ -853,17 +878,17 @@ collapseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================[ AUTO FARM + PICKUP + SERVER HOP LOGIC ]===================
-local farming = true
-local autoPickup = true
+local farming = false
+local autoPickup = false
 local orbitAngle = 0
-local cityFarm = true
-local cityPickup = true
+local cityFarm = false
+local cityPickup = false
 local cityNpcIndex = 1
 local orbitSpeed = 12
 local orbitRadius = 9
-local fixLag = true
-local noAttackAnim = true
-local antiWallStuck = true
+local fixLag = false
+local noAttackAnim = false
+local antiWallStuck = false
 local lastSafePosition = nil
 local wallStuckElapsed = 0
 local lagDisabledEmitters = {}
@@ -1102,7 +1127,7 @@ btnWeapon.MouseButton1Click:Connect(function()
 	end)
 end)
 
-local autoBang = true
+local autoBang = false
 local autoBangThreshold = 75
 local healingInProgress = false
 local lastHealAt = 0
@@ -1112,7 +1137,6 @@ btnAutoBang.MouseButton1Click:Connect(function()
 	btnAutoBang.Text = autoBang and "🤕 Auto Băng (ON)" or "🤕 Auto Băng (OFF)"
 	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
-
 
 local function applyDefaultToggleState()
 	btnFarm.Text = farming and "🟢 Đang Farm NPC2" or "✅ Auto Farm NPC2"
@@ -1343,13 +1367,20 @@ RunService.Heartbeat:Connect(function(dt)
 		if farming then
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
+				local targetPos = npcHRP.Position
+				if targetPos.Y < -100 then
+					targetPos = Vector3.new(targetPos.X, hrp.Position.Y, targetPos.Z)
+				end
 				local distance = (npcHRP.Position - hrp.Position).Magnitude
 					if distance > 60 then
-						hrp.CFrame = CFrame.new(npcHRP.Position + Vector3.new(0, 3, 0), npcHRP.Position)
+						local safePos = getSafeGroundPosition(targetPos)
+						hrp.CFrame = CFrame.new(safePos, targetPos)
 					else
 						orbitAngle += dt * orbitSpeed
 						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
-						hrp.CFrame = CFrame.new(npcHRP.Position + offset, npcHRP.Position)
+						local orbitTarget = targetPos + offset
+						local safeOrbit = getSafeGroundPosition(orbitTarget)
+						hrp.CFrame = CFrame.new(safeOrbit, targetPos)
 					end
 
 				local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
@@ -1380,13 +1411,20 @@ RunService.Heartbeat:Connect(function(dt)
 				local h = cityNpc and cityNpc:FindFirstChildOfClass("Humanoid")
 				local p = cityNpc and cityNpc:FindFirstChild("HumanoidRootPart")
 				if h and p and h.Health > 0 then
+					local cityPos = p.Position
+					if cityPos.Y < -100 then
+						cityPos = Vector3.new(cityPos.X, hrp.Position.Y, cityPos.Z)
+					end
 					local distance = (p.Position - hrp.Position).Magnitude
 					if distance > 60 then
-						hrp.CFrame = CFrame.new(p.Position + Vector3.new(0, 3, 0), p.Position)
+						local safePos = getSafeGroundPosition(cityPos)
+						hrp.CFrame = CFrame.new(safePos, cityPos)
 					else
 						orbitAngle += dt * orbitSpeed
 						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
-						hrp.CFrame = CFrame.new(p.Position + offset, p.Position)
+						local orbitTarget = cityPos + offset
+						local safeOrbit = getSafeGroundPosition(orbitTarget)
+						hrp.CFrame = CFrame.new(safeOrbit, cityPos)
 					end
 					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
 					if tool then
