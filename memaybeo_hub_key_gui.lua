@@ -527,7 +527,7 @@ keyTimeOutside.TextStrokeTransparency = 0.35
 Instance.new("UICorner", keyTimeOutside).CornerRadius = UDim.new(0, 8)
 
 local main = Instance.new("Frame", guiMain)
-main.Size = UDim2.new(0, 300, 0, 610)
+main.Size = UDim2.new(0, 300, 0, 650)
 main.Position = UDim2.new(0.05, 0, 0.2, 0)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 main.BackgroundTransparency = 0.5
@@ -805,11 +805,23 @@ btnNoAnim.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnNoAnim.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnNoAnim).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 447)
+local btnAntiWall = Instance.new("TextButton", content)
+btnAntiWall.Size = UDim2.new(0, 260, 0, 30)
+btnAntiWall.Position = UDim2.new(0, 20, 0, 447)
+btnAntiWall.Text = "🧱 Chống kẹt tường (OFF)"
+btnAntiWall.TextColor3 = Color3.new(1, 1, 1)
+btnAntiWall.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnAntiWall.BackgroundTransparency = 0.2
+btnAntiWall.Font = Enum.Font.GothamBold
+btnAntiWall.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnAntiWall.TextStrokeTransparency = 0.2
+Instance.new("UICorner", btnAntiWall).CornerRadius = UDim.new(0, 8)
+
+btnAutoBang.Position = UDim2.new(0, 20, 0, 484)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 485)
+weaponLabel.Position = UDim2.new(0, 20, 0, 522)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -821,7 +833,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 515)
+btnWeapon.Position = UDim2.new(0, 20, 0, 552)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -836,7 +848,7 @@ local collapsed = false
 collapseBtn.MouseButton1Click:Connect(function()
 	collapsed = not collapsed
 	content.Visible = not collapsed
-	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 610)
+	main.Size = collapsed and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 650)
 	collapseBtn.Text = collapsed and "+" or "-"
 end)
 
@@ -851,6 +863,9 @@ local orbitSpeed = 12
 local orbitRadius = 9
 local fixLag = false
 local noAttackAnim = false
+local antiWallStuck = false
+local lastSafePosition = nil
+local wallStuckElapsed = 0
 local lagDisabledEmitters = {}
 local lagDisabledTrails = {}
 
@@ -990,6 +1005,16 @@ btnNoAnim.MouseButton1Click:Connect(function()
 				track:Stop(0)
 			end)
 		end
+	end
+end)
+
+btnAntiWall.MouseButton1Click:Connect(function()
+	antiWallStuck = not antiWallStuck
+	btnAntiWall.Text = antiWallStuck and "🧱 Chống kẹt tường (ON)" or "🧱 Chống kẹt tường (OFF)"
+	btnAntiWall.BackgroundColor3 = antiWallStuck and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+	wallStuckElapsed = 0
+	if antiWallStuck and hrp then
+		lastSafePosition = hrp.Position
 	end
 end)
 
@@ -1255,6 +1280,26 @@ end
 -- Heartbeat loop
 RunService.Heartbeat:Connect(function(dt)
 	if hrp and hum and hum.Health > 0 then
+		if antiWallStuck then
+			local velocity = hrp.AssemblyLinearVelocity
+			local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+			if horizontalSpeed > 2 then
+				lastSafePosition = hrp.Position
+				wallStuckElapsed = 0
+			else
+				wallStuckElapsed += dt
+			end
+
+			if wallStuckElapsed >= 0.7 then
+				local returnPos = lastSafePosition or hrp.Position
+				local floorPos = Vector3.new(returnPos.X, returnPos.Y + 4, returnPos.Z)
+				pcall(function()
+					hrp.CFrame = CFrame.new(floorPos)
+				end)
+				wallStuckElapsed = 0
+			end
+		end
+
 		if noAttackAnim then
 			for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
 				pcall(function()
