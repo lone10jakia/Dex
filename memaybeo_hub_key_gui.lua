@@ -497,6 +497,7 @@ end)
 -- ====================[ GUI CHÍNH + COLLAPSE ]===================
 local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
 guiMain.Name = "MEMAYBEO_HUB"
+guiMain.ResetOnSpawn = false
 
 currentTimeOutside = Instance.new("TextLabel", guiMain)
 currentTimeOutside.Size = UDim2.new(0, 120, 0, 24)
@@ -792,11 +793,23 @@ btnCityPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnCityPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 410)
+local btnNoAnim = Instance.new("TextButton", content)
+btnNoAnim.Size = UDim2.new(0, 260, 0, 30)
+btnNoAnim.Position = UDim2.new(0, 20, 0, 410)
+btnNoAnim.Text = "🎬 Không hoạt ảnh đánh (OFF)"
+btnNoAnim.TextColor3 = Color3.new(1, 1, 1)
+btnNoAnim.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnNoAnim.BackgroundTransparency = 0.2
+btnNoAnim.Font = Enum.Font.GothamBold
+btnNoAnim.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnNoAnim.TextStrokeTransparency = 0.2
+Instance.new("UICorner", btnNoAnim).CornerRadius = UDim.new(0, 8)
+
+btnAutoBang.Position = UDim2.new(0, 20, 0, 447)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 448)
+weaponLabel.Position = UDim2.new(0, 20, 0, 485)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -808,7 +821,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 478)
+btnWeapon.Position = UDim2.new(0, 20, 0, 515)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -837,6 +850,7 @@ local cityNpcIndex = 1
 local orbitSpeed = 12
 local orbitRadius = 9
 local fixLag = false
+local noAttackAnim = false
 local lagDisabledEmitters = {}
 local lagDisabledTrails = {}
 
@@ -964,6 +978,19 @@ btnDistance.MouseButton1Click:Connect(function()
 	btnDistance.Text = fixLag and "🚀 Fix Lag (ON)" or "🚀 Fix Lag (OFF)"
 	btnDistance.BackgroundColor3 = fixLag and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 	applyFixLagState(fixLag)
+end)
+
+btnNoAnim.MouseButton1Click:Connect(function()
+	noAttackAnim = not noAttackAnim
+	btnNoAnim.Text = noAttackAnim and "🎬 Không hoạt ảnh đánh (ON)" or "🎬 Không hoạt ảnh đánh (OFF)"
+	btnNoAnim.BackgroundColor3 = noAttackAnim and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+	if noAttackAnim and hum and hum.Parent then
+		for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+			pcall(function()
+				track:Stop(0)
+			end)
+		end
+	end
 end)
 
 updateSpeedLabel()
@@ -1228,6 +1255,13 @@ end
 -- Heartbeat loop
 RunService.Heartbeat:Connect(function(dt)
 	if hrp and hum and hum.Health > 0 then
+		if noAttackAnim then
+			for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+				pcall(function()
+					track:Stop(0)
+				end)
+			end
+		end
 		if farming then
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
