@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
 local lp = Players.LocalPlayer
 local VirtualUser = game:GetService("VirtualUser")
 local placeId = game.PlaceId
@@ -114,6 +115,8 @@ confirm.TextStrokeTransparency = 0.2
 Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
 
 -- Keys
+local KEY_FREE = "free123"
+local KEY_VIP = "vip123"
 local KEY_URL = "https://mwmaksjzj-1.onrender.com"
 local KEY_VALIDATE = KEY_URL .. "/validate/"
 local KEY_ENDPOINTS = {
@@ -652,7 +655,7 @@ speedLabel.TextColor3 = Color3.new(1, 1, 1)
 speedLabel.Font = Enum.Font.GothamBold
 speedLabel.TextSize = 14
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-speedLabel.Text = "Tốc độ: 12x"
+speedLabel.Text = "Tốc độ: 12"
 speedLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 speedLabel.TextStrokeTransparency = 0.25
 
@@ -664,14 +667,40 @@ distanceLabel.TextColor3 = Color3.new(1, 1, 1)
 distanceLabel.Font = Enum.Font.GothamBold
 distanceLabel.TextSize = 14
 distanceLabel.TextXAlignment = Enum.TextXAlignment.Left
-distanceLabel.Text = "Khoảng cách: 10"
+distanceLabel.Text = "Khoảng cách: 9"
 distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
 distanceLabel.TextStrokeTransparency = 0.25
 
+local speedInput = Instance.new("TextBox", content)
+speedInput.Size = UDim2.new(0, 125, 0, 26)
+speedInput.Position = UDim2.new(0, 20, 0, 235)
+speedInput.PlaceholderText = "Nhập tốc độ"
+speedInput.Text = "12"
+speedInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+speedInput.BackgroundTransparency = 0.2
+speedInput.TextColor3 = Color3.new(1, 1, 1)
+speedInput.Font = Enum.Font.GothamBold
+speedInput.TextSize = 13
+speedInput.ClearTextOnFocus = false
+Instance.new("UICorner", speedInput).CornerRadius = UDim.new(0, 8)
+
+local distanceInput = Instance.new("TextBox", content)
+distanceInput.Size = UDim2.new(0, 125, 0, 26)
+distanceInput.Position = UDim2.new(0, 155, 0, 235)
+distanceInput.PlaceholderText = "Nhập khoảng cách"
+distanceInput.Text = "9"
+distanceInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+distanceInput.BackgroundTransparency = 0.2
+distanceInput.TextColor3 = Color3.new(1, 1, 1)
+distanceInput.Font = Enum.Font.GothamBold
+distanceInput.TextSize = 13
+distanceInput.ClearTextOnFocus = false
+Instance.new("UICorner", distanceInput).CornerRadius = UDim.new(0, 8)
+
 local btnSpeed = Instance.new("TextButton", content)
 btnSpeed.Size = UDim2.new(0, 260, 0, 28)
-btnSpeed.Position = UDim2.new(0, 20, 0, 235)
-btnSpeed.Text = "⚡ Chỉnh tốc độ"
+btnSpeed.Position = UDim2.new(0, 20, 0, 265)
+btnSpeed.Text = "⚡ Áp dụng tốc độ/khoảng cách"
 btnSpeed.TextColor3 = Color3.new(1, 1, 1)
 btnSpeed.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btnSpeed.BackgroundTransparency = 0.2
@@ -682,8 +711,8 @@ Instance.new("UICorner", btnSpeed).CornerRadius = UDim.new(0, 8)
 
 local btnDistance = Instance.new("TextButton", content)
 btnDistance.Size = UDim2.new(0, 260, 0, 28)
-btnDistance.Position = UDim2.new(0, 20, 0, 265)
-btnDistance.Text = "📏 Chỉnh khoảng cách"
+btnDistance.Position = UDim2.new(0, 20, 0, 295)
+btnDistance.Text = "🚀 Fix Lag (OFF)"
 btnDistance.TextColor3 = Color3.new(1, 1, 1)
 btnDistance.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btnDistance.BackgroundTransparency = 0.2
@@ -729,11 +758,11 @@ btnCityPickup.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnCityPickup.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnCityPickup).CornerRadius = UDim.new(0, 8)
 
-btnAutoBang.Position = UDim2.new(0, 20, 0, 380)
+btnAutoBang.Position = UDim2.new(0, 20, 0, 410)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 420)
+weaponLabel.Position = UDim2.new(0, 20, 0, 450)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -745,7 +774,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 445)
+btnWeapon.Position = UDim2.new(0, 20, 0, 475)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -771,12 +800,9 @@ local orbitAngle = 0
 local cityFarm = false
 local cityPickup = false
 local cityNpcIndex = 1
-local speedOptions = { 10, 12, 15, 18 }
-local distanceOptions = { 6, 9, 12, 15 }
-local speedIndex = 2
-local distanceIndex = 2
-local orbitSpeed = speedOptions[speedIndex]
-local orbitRadius = distanceOptions[distanceIndex]
+local orbitSpeed = 12
+local orbitRadius = 9
+local fixLag = false
 
 btnFarm.MouseButton1Click:Connect(function()
 	farming = not farming
@@ -834,7 +860,7 @@ btnCityPickup.MouseButton1Click:Connect(function()
 end)
 
 local function updateSpeedLabel()
-	speedLabel.Text = "Tốc độ: " .. tostring(orbitSpeed) .. "x"
+	speedLabel.Text = "Tốc độ: " .. tostring(orbitSpeed)
 end
 
 local function updateDistanceLabel()
@@ -842,43 +868,47 @@ local function updateDistanceLabel()
 end
 
 btnSpeed.MouseButton1Click:Connect(function()
-	speedIndex += 1
-	if speedIndex > #speedOptions then
-		speedIndex = 1
+	local parsedSpeed = tonumber(speedInput.Text)
+	local parsedDistance = tonumber(distanceInput.Text)
+	if parsedSpeed and parsedSpeed >= 1 and parsedSpeed <= 60 then
+		orbitSpeed = math.floor(parsedSpeed)
+	else
+		speedInput.Text = tostring(orbitSpeed)
 	end
-	orbitSpeed = speedOptions[speedIndex]
+	if parsedDistance and parsedDistance >= 2 and parsedDistance <= 50 then
+		orbitRadius = math.floor(parsedDistance)
+	else
+		distanceInput.Text = tostring(orbitRadius)
+	end
 	updateSpeedLabel()
+	updateDistanceLabel()
 end)
 
 btnDistance.MouseButton1Click:Connect(function()
-	distanceIndex += 1
-	if distanceIndex > #distanceOptions then
-		distanceIndex = 1
+	fixLag = not fixLag
+	btnDistance.Text = fixLag and "🚀 Fix Lag (ON)" or "🚀 Fix Lag (OFF)"
+	btnDistance.BackgroundColor3 = fixLag and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+	if fixLag then
+		pcall(function()
+			Lighting.GlobalShadows = false
+			Lighting.FogEnd = 1e10
+			Lighting.Brightness = 1
+			for _, obj in ipairs(workspace:GetDescendants()) do
+				if obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
+					obj.Enabled = false
+				elseif obj:IsA("BasePart") then
+					obj.Material = Enum.Material.Plastic
+					obj.Reflectance = 0
+				end
+			end
+		end)
 	end
-	orbitRadius = distanceOptions[distanceIndex]
-	updateDistanceLabel()
-end)
-
-btnSpeed.MouseButton2Click:Connect(function()
-	speedIndex -= 1
-	if speedIndex < 1 then
-		speedIndex = #speedOptions
-	end
-	orbitSpeed = speedOptions[speedIndex]
-	updateSpeedLabel()
-end)
-
-btnDistance.MouseButton2Click:Connect(function()
-	distanceIndex -= 1
-	if distanceIndex < 1 then
-		distanceIndex = #distanceOptions
-	end
-	orbitRadius = distanceOptions[distanceIndex]
-	updateDistanceLabel()
 end)
 
 updateSpeedLabel()
 updateDistanceLabel()
+speedInput.Text = tostring(orbitSpeed)
+distanceInput.Text = tostring(orbitRadius)
 
 if queue_on_teleport then
 	local scriptText = string.format(
