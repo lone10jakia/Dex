@@ -853,17 +853,17 @@ collapseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================[ AUTO FARM + PICKUP + SERVER HOP LOGIC ]===================
-local farming = false
-local autoPickup = false
+local farming = true
+local autoPickup = true
 local orbitAngle = 0
-local cityFarm = false
-local cityPickup = false
+local cityFarm = true
+local cityPickup = true
 local cityNpcIndex = 1
 local orbitSpeed = 12
 local orbitRadius = 9
-local fixLag = false
-local noAttackAnim = false
-local antiWallStuck = false
+local fixLag = true
+local noAttackAnim = true
+local antiWallStuck = true
 local lastSafePosition = nil
 local wallStuckElapsed = 0
 local lagDisabledEmitters = {}
@@ -1102,7 +1102,7 @@ btnWeapon.MouseButton1Click:Connect(function()
 	end)
 end)
 
-local autoBang = false
+local autoBang = true
 local autoBangThreshold = 75
 local healingInProgress = false
 local lastHealAt = 0
@@ -1112,6 +1112,39 @@ btnAutoBang.MouseButton1Click:Connect(function()
 	btnAutoBang.Text = autoBang and "🤕 Auto Băng (ON)" or "🤕 Auto Băng (OFF)"
 	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
+
+
+local function applyDefaultToggleState()
+	btnFarm.Text = farming and "🟢 Đang Farm NPC2" or "✅ Auto Farm NPC2"
+	btnFarm.BackgroundColor3 = farming and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnPickup.Text = autoPickup and "🟢 Nhặt Drop GiangHo2 (ON)" or "🟢 Nhặt Drop GiangHo2 (OFF)"
+	btnPickup.BackgroundColor3 = autoPickup and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnCityFarm.Text = cityFarm and "⚔️ Auto Farm CityNPC (ON)" or "⚔️ Auto Farm CityNPC (OFF)"
+	btnCityFarm.BackgroundColor3 = cityFarm and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnCityPickup.Text = cityPickup and "📦 Nhặt Drop CityNPC (ON)" or "📦 Nhặt Drop CityNPC (OFF)"
+	btnCityPickup.BackgroundColor3 = cityPickup and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnDistance.Text = fixLag and "🚀 Fix Lag (ON)" or "🚀 Fix Lag (OFF)"
+	btnDistance.BackgroundColor3 = fixLag and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+	applyFixLagState(fixLag)
+
+	btnNoAnim.Text = noAttackAnim and "🎬 Không hoạt ảnh đánh (ON)" or "🎬 Không hoạt ảnh đánh (OFF)"
+	btnNoAnim.BackgroundColor3 = noAttackAnim and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnAntiWall.Text = antiWallStuck and "🧱 Chống kẹt tường (ON)" or "🧱 Chống kẹt tường (OFF)"
+	btnAntiWall.BackgroundColor3 = antiWallStuck and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+	if antiWallStuck and hrp then
+		lastSafePosition = hrp.Position
+	end
+
+	btnAutoBang.Text = autoBang and "🤕 Auto Băng (ON)" or "🤕 Auto Băng (OFF)"
+	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+end
+
+applyDefaultToggleState()
 
 local function findHealTool()
 	local char = lp.Character
