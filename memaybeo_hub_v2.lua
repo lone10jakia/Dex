@@ -61,7 +61,7 @@ ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 130, 0, 350)
+MainFrame.Size = UDim2.new(0, 130, 0, 380)
 MainFrame.Position = UDim2.new(1, 150, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Visible = false
@@ -101,10 +101,11 @@ local StunButton = makeButton(130, "🥴 Choáng:")
 local AutoAttackButton = makeButton(165, "⚔️ Auto Đánh:")
 local FixLagButton = makeButton(200, "⚡ FixLag:")
 local AutoBangButton = makeButton(235, "🤕 Auto Băng:")
+local AutoBuyBandageButton = makeButton(270, "🛒 Mua Băng:")
 
 local WeaponLabel = Instance.new("TextLabel")
 WeaponLabel.Size = UDim2.new(0, 110, 0, 16)
-WeaponLabel.Position = UDim2.new(0, 10, 0, 270)
+WeaponLabel.Position = UDim2.new(0, 10, 0, 305)
 WeaponLabel.BackgroundTransparency = 1
 WeaponLabel.Text = "🎯 Vũ khí:"
 WeaponLabel.TextSize = 12
@@ -115,7 +116,7 @@ WeaponLabel.Parent = MainFrame
 
 local WeaponInput = Instance.new("TextBox")
 WeaponInput.Size = UDim2.new(0, 110, 0, 24)
-WeaponInput.Position = UDim2.new(0, 10, 0, 288)
+WeaponInput.Position = UDim2.new(0, 10, 0, 323)
 WeaponInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 WeaponInput.Text = ""
 WeaponInput.PlaceholderText = "Tên vũ khí"
@@ -128,7 +129,7 @@ Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 
 local WeaponSelectButton = Instance.new("TextButton")
 WeaponSelectButton.Size = UDim2.new(0, 110, 0, 26)
-WeaponSelectButton.Position = UDim2.new(0, 10, 0, 316)
+WeaponSelectButton.Position = UDim2.new(0, 10, 0, 351)
 WeaponSelectButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 WeaponSelectButton.Text = "🎯 Chọn vũ khí"
 WeaponSelectButton.TextSize = 11
@@ -146,6 +147,10 @@ local stunBusy = false
 local autoAttack = persisted.autoAttack or false
 local fixLag = persisted.fixLag or false
 local autoBang = persisted.autoBang or false
+local autoBandageBuy = persisted.autoBandageBuy
+if autoBandageBuy == nil then
+	autoBandageBuy = true
+end
 local preferredWeaponName = persisted.preferredWeaponName or ""
 local autoWeaponCapture = persisted.autoWeaponCapture
 if autoWeaponCapture == nil then
@@ -170,6 +175,7 @@ local function persistState()
 		autoAttack = autoAttack,
 		fixLag = fixLag,
 		autoBang = autoBang,
+		autoBandageBuy = autoBandageBuy,
 		preferredWeaponName = preferredWeaponName,
 		autoWeaponCapture = autoWeaponCapture,
 	})
@@ -418,6 +424,12 @@ AutoBangButton.MouseButton1Click:Connect(function()
 	persistState()
 end)
 
+AutoBuyBandageButton.MouseButton1Click:Connect(function()
+	autoBandageBuy = not autoBandageBuy
+	setToggleText(AutoBuyBandageButton, "🛒 Mua Băng:", autoBandageBuy)
+	persistState()
+end)
+
 local function isHealTool(tool)
 	local n = tool.Name:lower()
 	return n:find("bang") or n:find("băng") or n:find("med") or n:find("heal") or n:find("kit") or n:find("band")
@@ -597,9 +609,20 @@ end
 
 task.spawn(function()
 	while task.wait(0.2) do
-		if autoBang and LocalPlayer.Character and not healingInProgress then
+		if (autoBang or autoBandageBuy) and LocalPlayer.Character and not healingInProgress then
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
+
+			local currentBandages = countBandages()
+			if autoBandageBuy and currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+				local needed = autoBandageMinCount - currentBandages
+				local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+				if buyBandagePack(buyTimes) then
+					lastBandageBuyAt = os.clock()
+					task.wait(0.3)
+				end
+			end
+
 			if hum and hum.Health >= hum.MaxHealth and os.clock() < postHealForceUntil then
 				local equipped = char:FindFirstChildOfClass("Tool")
 				if equipped and isHealTool(equipped) then
@@ -741,6 +764,7 @@ local function applyInitialState()
 	setToggleText(AutoAttackButton, "⚔️ Auto Đánh:", autoAttack)
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
+	setToggleText(AutoBuyBandageButton, "🛒 Mua Băng:", autoBandageBuy)
 	WeaponInput.Text = preferredWeaponName
 	if preferredWeaponName ~= "" then
 		WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
