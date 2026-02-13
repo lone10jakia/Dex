@@ -158,6 +158,8 @@ local stunDuration = 0.6
 local stunSpeed = 8
 local autoBangThreshold = 75
 local autoBangCooldown = 0.4
+local autoBandageMinCount = 99
+local bandageBuyCooldown = 1.5
 
 local function persistState()
 	saveSettings({
@@ -483,10 +485,104 @@ local function waitForEquipped(char, tool, timeout)
 	return char:FindFirstChildOfClass("Tool") == tool
 end
 
+local function findBandagePrompt()
+	local shopRoot = Workspace:FindFirstChild("NPCs")
+		and Workspace.NPCs:FindFirstChild("Shop")
+		and Workspace.NPCs.Shop:FindFirstChild("Bán băng gạc")
+	if not shopRoot then
+		return nil
+	end
+
+	local directPrompt = shopRoot:FindFirstChild("ProximityPrompt")
+	if directPrompt and directPrompt:IsA("ProximityPrompt") then
+		return directPrompt
+	end
+
+	for _, node in ipairs(shopRoot:GetDescendants()) do
+		if node:IsA("ProximityPrompt") then
+			return node
+		end
+	end
+
+	return nil
+end
+
+local function buyBandagePack(times)
+	if not fireproximityprompt then
+		return false
+	end
+
+	local prompt = findBandagePrompt()
+	if not prompt then
+		return false
+	end
+
+	times = math.max(1, times or 5)
+	for _ = 1, times do
+		pcall(function()
+			fireproximityprompt(prompt)
+		end)
+		task.wait(0.2)
+	end
+
+	return true
+end
+
+local function isBandageTool(tool)
+	if not (tool and tool:IsA("Tool")) then
+		return false
+	end
+
+	local n = tool.Name:lower()
+	return n:find("băng gạc") or n:find("bang gac") or n:find("bandage")
+end
+
+local function readBandageAmountFromTool(tool)
+	local valueNames = { "Amount", "Count", "Stack", "Uses", "Value" }
+	for _, key in ipairs(valueNames) do
+		local child = tool:FindFirstChild(key)
+		if child and (child:IsA("IntValue") or child:IsA("NumberValue")) then
+			return child.Value
+		end
+	end
+
+	for _, key in ipairs(valueNames) do
+		local attr = tool:GetAttribute(key)
+		if type(attr) == "number" then
+			return attr
+		end
+	end
+
+	local digits = tool.Name:match("(%d+)")
+	if digits then
+		return tonumber(digits) or 1
+	end
+
+	return 1
+end
+
+local function countBandages()
+	local total = 0
+	local function collect(container)
+		for _, tool in ipairs(container:GetChildren()) do
+			if isBandageTool(tool) then
+				total += readBandageAmountFromTool(tool)
+			end
+		end
+	end
+
+	if LocalPlayer.Character then
+		collect(LocalPlayer.Character)
+	end
+	collect(LocalPlayer.Backpack)
+	return total
+end
+
 local lastHealAt = 0
 local healingInProgress = false
 local lastForceEquipAt = 0
 local postHealForceUntil = 0
+local lastBandageBuyAt = 0
 
 local function forcePreferredWeapon(char, hum)
 	if not char or not hum then
@@ -528,6 +624,16 @@ task.spawn(function()
 
 			if os.clock() - lastHealAt < autoBangCooldown then
 				continue
+			end
+
+			local currentBandages = countBandages()
+			if currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+				local needed = autoBandageMinCount - currentBandages
+				local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+				if buyBandagePack(buyTimes) then
+					lastBandageBuyAt = os.clock()
+					task.wait(0.3)
+				end
 			end
 
 			local current = char:FindFirstChildOfClass("Tool")

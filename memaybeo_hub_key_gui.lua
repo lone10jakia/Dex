@@ -1052,7 +1052,7 @@ local function findBandagePrompt()
 	return nil
 end
 
-local function buyBandagePack()
+local function buyBandagePack(times)
 	if not fireproximityprompt then
 		return false
 	end
@@ -1060,13 +1060,63 @@ local function buyBandagePack()
 	if not prompt then
 		return false
 	end
-	for _ = 1, 5 do
+	times = math.max(1, times or 5)
+	for _ = 1, times do
 		pcall(function()
 			fireproximityprompt(prompt)
 		end)
 		task.wait(0.2)
 	end
 	return true
+end
+
+local function readBandageAmountFromTool(tool)
+	local values = { "Amount", "Count", "Stack", "Uses", "Value" }
+	for _, key in ipairs(values) do
+		local child = tool:FindFirstChild(key)
+		if child and (child:IsA("IntValue") or child:IsA("NumberValue")) then
+			return child.Value
+		end
+	end
+
+	for _, key in ipairs(values) do
+		local attr = tool:GetAttribute(key)
+		if type(attr) == "number" then
+			return attr
+		end
+	end
+
+	local digits = tool.Name:match("(%d+)")
+	if digits then
+		return tonumber(digits) or 1
+	end
+
+	return 1
+end
+
+local function isBandageTool(tool)
+	if not (tool and tool:IsA("Tool")) then
+		return false
+	end
+	local n = tool.Name:lower()
+	return n:find("băng gạc") or n:find("bang gac") or n:find("bandage")
+end
+
+local function countBandages()
+	local total = 0
+	local function collect(container)
+		for _, tool in ipairs(container:GetChildren()) do
+			if isBandageTool(tool) then
+				total += readBandageAmountFromTool(tool)
+			end
+		end
+	end
+
+	if lp.Character then
+		collect(lp.Character)
+	end
+	collect(lp.Backpack)
+	return total
 end
 
 local preferredWeaponName = ""
@@ -1104,8 +1154,11 @@ end)
 
 local autoBang = false
 local autoBangThreshold = 75
+local autoBandageMinCount = 99
+local bandageBuyCooldown = 1.5
 local healingInProgress = false
 local lastHealAt = 0
+local lastBandageBuyAt = 0
 
 btnAutoBang.MouseButton1Click:Connect(function()
 	autoBang = not autoBang
@@ -1222,6 +1275,16 @@ task.spawn(function()
 		end
 		if os.clock() - lastHealAt < 0.5 then
 			continue
+		end
+
+		local currentBandages = countBandages()
+		if currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+			local needed = autoBandageMinCount - currentBandages
+			local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+			if buyBandagePack(buyTimes) then
+				lastBandageBuyAt = os.clock()
+				task.wait(0.3)
+			end
 		end
 
 		local healTool = findHealTool()
