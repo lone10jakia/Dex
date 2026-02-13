@@ -497,6 +497,11 @@ local function waitForEquipped(char, tool, timeout)
 	return char:FindFirstChildOfClass("Tool") == tool
 end
 
+local function isBandageNodeName(name)
+	local n = string.lower(name or "")
+	return (n:find("băng") and n:find("gạc")) or (n:find("bang") and n:find("gac")) or n:find("bandage")
+end
+
 local function findBandagePrompt()
 	local shopRoot = Workspace:FindFirstChild("NPCs")
 		and Workspace.NPCs:FindFirstChild("Shop")
@@ -507,23 +512,41 @@ local function findBandagePrompt()
 
 	local itemsFolder = shopRoot:FindFirstChild("Items")
 	if itemsFolder then
-		local bandageItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
-		if bandageItem then
-			local itemPrompt = bandageItem:FindFirstChildWhichIsA("ProximityPrompt", true)
-			if itemPrompt then
-				return itemPrompt
+		local exactItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
+		if exactItem then
+			local exactPrompt = exactItem:FindFirstChildWhichIsA("ProximityPrompt", true)
+			if exactPrompt then
+				return exactPrompt
 			end
 		end
-	end
 
-	local directPrompt = shopRoot:FindFirstChildWhichIsA("ProximityPrompt")
-	if directPrompt then
-		return directPrompt
+		local firstItemPrompt = nil
+		for _, node in ipairs(itemsFolder:GetDescendants()) do
+			if node:IsA("ProximityPrompt") then
+				if not firstItemPrompt then
+					firstItemPrompt = node
+				end
+				local owner = node.Parent
+				if owner and isBandageNodeName(owner.Name) then
+					return node
+				end
+				if owner and owner.Parent and isBandageNodeName(owner.Parent.Name) then
+					return node
+				end
+			end
+		end
+		if firstItemPrompt then
+			return firstItemPrompt
+		end
 	end
 
 	for _, node in ipairs(shopRoot:GetDescendants()) do
 		if node:IsA("ProximityPrompt") then
-			return node
+			local owner = node.Parent
+			local ownerName = owner and string.lower(owner.Name) or ""
+			if not ownerName:find("shop") and not ownerName:find("cửa") and not ownerName:find("hang") then
+				return node
+			end
 		end
 	end
 
