@@ -769,6 +769,18 @@ btnAutoBang.TextStrokeColor3 = Color3.new(0, 0, 0)
 btnAutoBang.TextStrokeTransparency = 0.2
 Instance.new("UICorner", btnAutoBang).CornerRadius = UDim.new(0, 8)
 
+local btnAutoBuyBandage = Instance.new("TextButton", content)
+btnAutoBuyBandage.Size = UDim2.new(0, 260, 0, 30)
+btnAutoBuyBandage.Position = UDim2.new(0, 20, 0, 522)
+btnAutoBuyBandage.Text = "🛒 Auto mua Băng gạc (OFF)"
+btnAutoBuyBandage.TextColor3 = Color3.new(1, 1, 1)
+btnAutoBuyBandage.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btnAutoBuyBandage.BackgroundTransparency = 0.2
+btnAutoBuyBandage.Font = Enum.Font.GothamBold
+btnAutoBuyBandage.TextStrokeColor3 = Color3.new(0, 0, 0)
+btnAutoBuyBandage.TextStrokeTransparency = 0.2
+Instance.new("UICorner", btnAutoBuyBandage).CornerRadius = UDim.new(0, 8)
+
 local btnCityFarm = Instance.new("TextButton", content)
 btnCityFarm.Size = UDim2.new(0, 260, 0, 30)
 btnCityFarm.Position = UDim2.new(0, 20, 0, 335)
@@ -821,7 +833,7 @@ btnAutoBang.Position = UDim2.new(0, 20, 0, 484)
 
 local weaponLabel = Instance.new("TextLabel", content)
 weaponLabel.Size = UDim2.new(0, 260, 0, 20)
-weaponLabel.Position = UDim2.new(0, 20, 0, 522)
+weaponLabel.Position = UDim2.new(0, 20, 0, 560)
 weaponLabel.BackgroundTransparency = 1
 weaponLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 weaponLabel.Font = Enum.Font.GothamBold
@@ -833,7 +845,7 @@ weaponLabel.TextStrokeTransparency = 0.25
 
 local btnWeapon = Instance.new("TextButton", content)
 btnWeapon.Size = UDim2.new(0, 260, 0, 30)
-btnWeapon.Position = UDim2.new(0, 20, 0, 552)
+btnWeapon.Position = UDim2.new(0, 20, 0, 590)
 btnWeapon.Text = "🎯 Chọn vũ khí"
 btnWeapon.TextColor3 = Color3.new(1, 1, 1)
 btnWeapon.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -1153,6 +1165,7 @@ btnWeapon.MouseButton1Click:Connect(function()
 end)
 
 local autoBang = false
+local autoBandageBuy = true
 local autoBangThreshold = 75
 local autoBandageMinCount = 99
 local bandageBuyCooldown = 1.5
@@ -1164,6 +1177,13 @@ btnAutoBang.MouseButton1Click:Connect(function()
 	autoBang = not autoBang
 	btnAutoBang.Text = autoBang and "🤕 Auto Băng (ON)" or "🤕 Auto Băng (OFF)"
 	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+end)
+
+btnAutoBuyBandage.MouseButton1Click:Connect(function()
+	autoBandageBuy = not autoBandageBuy
+	btnAutoBuyBandage.Text = autoBandageBuy and "🛒 Auto mua Băng gạc (ON)" or "🛒 Auto mua Băng gạc (OFF)"
+	btnAutoBuyBandage.BackgroundColor3 = autoBandageBuy and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end)
 
 local function applyDefaultToggleState()
@@ -1194,6 +1214,9 @@ local function applyDefaultToggleState()
 
 	btnAutoBang.Text = autoBang and "🤕 Auto Băng (ON)" or "🤕 Auto Băng (OFF)"
 	btnAutoBang.BackgroundColor3 = autoBang and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+
+	btnAutoBuyBandage.Text = autoBandageBuy and "🛒 Auto mua Băng gạc (ON)" or "🛒 Auto mua Băng gạc (OFF)"
+	btnAutoBuyBandage.BackgroundColor3 = autoBandageBuy and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
 end
 
 applyDefaultToggleState()
@@ -1265,14 +1288,14 @@ end
 
 task.spawn(function()
 	while task.wait(0.25) do
-		if not autoBang or healingInProgress then
+		if (not autoBang and not autoBandageBuy) or healingInProgress then
 			continue
 		end
 		local char = lp.Character
 		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 
 		local currentBandages = countBandages()
-		if currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+		if autoBandageBuy and currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
 			local needed = autoBandageMinCount - currentBandages
 			local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
 			if buyBandagePack(buyTimes) then
