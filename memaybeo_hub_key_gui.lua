@@ -482,19 +482,10 @@ end)
 
 -- ====================[ NHÂN VẬT ]===================
 local hrp, hum
-local groundRayParams = RaycastParams.new()
-groundRayParams.FilterType = Enum.RaycastFilterType.Blacklist
-groundRayParams.FilterDescendantsInstances = {}
-
-local function updateGroundRayFilter(char)
-	groundRayParams.FilterDescendantsInstances = { char }
-end
-
 local function getChar()
 	local char = lp.Character or lp.CharacterAdded:Wait()
 	hrp = char:WaitForChild("HumanoidRootPart")
 	hum = char:WaitForChild("Humanoid")
-	updateGroundRayFilter(char)
 	return char
 end
 getChar()
@@ -502,23 +493,6 @@ lp.CharacterAdded:Connect(function()
 	task.wait(1)
 	getChar()
 end)
-
-local function getSafeGroundPosition(targetPos)
-	local currentY = hrp and hrp.Position.Y or targetPos.Y
-	local rayStartY = math.max(currentY + 120, targetPos.Y + 40)
-	local rayOrigin = Vector3.new(targetPos.X, rayStartY, targetPos.Z)
-	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -520, 0), groundRayParams)
-	local y = currentY
-	if rayResult then
-		y = rayResult.Position.Y + 4
-	end
-	if y > currentY + 12 then
-		y = currentY + 12
-	elseif y < currentY - 20 then
-		y = currentY - 20
-	end
-	return Vector3.new(targetPos.X, y, targetPos.Z)
-end
 
 -- ====================[ GUI CHÍNH + COLLAPSE ]===================
 local guiMain = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
@@ -834,7 +808,7 @@ Instance.new("UICorner", btnNoAnim).CornerRadius = UDim.new(0, 8)
 local btnAntiWall = Instance.new("TextButton", content)
 btnAntiWall.Size = UDim2.new(0, 260, 0, 30)
 btnAntiWall.Position = UDim2.new(0, 20, 0, 447)
-btnAntiWall.Text = "🧱 Chống kẹt tường (OFF)"
+btnAntiWall.Text = "🧱 Chống kẹt tường (TẮT)"
 btnAntiWall.TextColor3 = Color3.new(1, 1, 1)
 btnAntiWall.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btnAntiWall.BackgroundTransparency = 0.2
@@ -1369,27 +1343,23 @@ RunService.Heartbeat:Connect(function(dt)
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
 				local targetPos = npcHRP.Position
-				if targetPos.Y < -20 then
-					targetPos = Vector3.new(targetPos.X, hrp.Position.Y, targetPos.Z)
-				end
-				local distance = (targetPos - hrp.Position).Magnitude
+				if targetPos.Y >= -20 then
+					local distance = (targetPos - hrp.Position).Magnitude
 					if distance > 60 then
-						local safePos = getSafeGroundPosition(targetPos)
-						hrp.CFrame = CFrame.new(safePos, targetPos)
+						hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0), targetPos)
 					else
 						orbitAngle += dt * orbitSpeed
 						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
-						local orbitTarget = targetPos + offset
-						local safeOrbit = getSafeGroundPosition(orbitTarget)
-						hrp.CFrame = CFrame.new(safeOrbit, targetPos)
+						hrp.CFrame = CFrame.new(targetPos + offset, targetPos)
 					end
 
-				local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
-				if tool then
-					tool.Parent = lp.Character
-					pcall(function()
-						tool:Activate()
-					end)
+					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+					if tool then
+						tool.Parent = lp.Character
+						pcall(function()
+							tool:Activate()
+						end)
+					end
 				end
 			end
 		end
@@ -1414,28 +1384,26 @@ RunService.Heartbeat:Connect(function(dt)
 				if h and p and h.Health > 0 then
 					local cityPos = p.Position
 					if cityPos.Y < -20 then
-						cityPos = Vector3.new(cityPos.X, hrp.Position.Y, cityPos.Z)
-					end
-					local distance = (cityPos - hrp.Position).Magnitude
-					if distance > 60 then
-						local safePos = getSafeGroundPosition(cityPos)
-						hrp.CFrame = CFrame.new(safePos, cityPos)
-					else
-						orbitAngle += dt * orbitSpeed
-						local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
-						local orbitTarget = cityPos + offset
-						local safeOrbit = getSafeGroundPosition(orbitTarget)
-						hrp.CFrame = CFrame.new(safeOrbit, cityPos)
-					end
-					local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
-					if tool then
-						tool.Parent = lp.Character
-						pcall(function()
-							tool:Activate()
-						end)
-					end
-					if h.Health <= 0 then
 						cityNpcIndex += 1
+					else
+						local distance = (cityPos - hrp.Position).Magnitude
+						if distance > 60 then
+							hrp.CFrame = CFrame.new(cityPos + Vector3.new(0, 3, 0), cityPos)
+						else
+							orbitAngle += dt * orbitSpeed
+							local offset = Vector3.new(math.cos(orbitAngle), 0, math.sin(orbitAngle)) * orbitRadius
+							hrp.CFrame = CFrame.new(cityPos + offset, cityPos)
+						end
+						local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+						if tool then
+							tool.Parent = lp.Character
+							pcall(function()
+								tool:Activate()
+							end)
+						end
+						if h.Health <= 0 then
+							cityNpcIndex += 1
+						end
 					end
 				else
 					cityNpcIndex += 1
