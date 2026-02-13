@@ -505,16 +505,17 @@ end)
 
 local function getSafeGroundPosition(targetPos)
 	local currentY = hrp and hrp.Position.Y or targetPos.Y
-	local rayOrigin = targetPos + Vector3.new(0, 80, 0)
-	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -240, 0), groundRayParams)
-	local y = targetPos.Y + 3
+	local rayStartY = math.max(currentY + 120, targetPos.Y + 40)
+	local rayOrigin = Vector3.new(targetPos.X, rayStartY, targetPos.Z)
+	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -520, 0), groundRayParams)
+	local y = currentY
 	if rayResult then
 		y = rayResult.Position.Y + 4
 	end
-	if y > currentY + 18 then
-		y = currentY + 18
-	elseif y < currentY - 40 then
-		y = currentY - 40
+	if y > currentY + 12 then
+		y = currentY + 12
+	elseif y < currentY - 20 then
+		y = currentY - 20
 	end
 	return Vector3.new(targetPos.X, y, targetPos.Z)
 end
@@ -1368,10 +1369,10 @@ RunService.Heartbeat:Connect(function(dt)
 			local npc, npcHRP = getNearestNPC2()
 			if npcHRP then
 				local targetPos = npcHRP.Position
-				if targetPos.Y < -100 then
+				if targetPos.Y < -20 then
 					targetPos = Vector3.new(targetPos.X, hrp.Position.Y, targetPos.Z)
 				end
-				local distance = (npcHRP.Position - hrp.Position).Magnitude
+				local distance = (targetPos - hrp.Position).Magnitude
 					if distance > 60 then
 						local safePos = getSafeGroundPosition(targetPos)
 						hrp.CFrame = CFrame.new(safePos, targetPos)
@@ -1412,10 +1413,10 @@ RunService.Heartbeat:Connect(function(dt)
 				local p = cityNpc and cityNpc:FindFirstChild("HumanoidRootPart")
 				if h and p and h.Health > 0 then
 					local cityPos = p.Position
-					if cityPos.Y < -100 then
+					if cityPos.Y < -20 then
 						cityPos = Vector3.new(cityPos.X, hrp.Position.Y, cityPos.Z)
 					end
-					local distance = (p.Position - hrp.Position).Magnitude
+					local distance = (cityPos - hrp.Position).Magnitude
 					if distance > 60 then
 						local safePos = getSafeGroundPosition(cityPos)
 						hrp.CFrame = CFrame.new(safePos, cityPos)
