@@ -1050,36 +1050,96 @@ local function isHealTool(tool)
 end
 
 local function findBandagePrompt()
-	local shop = workspace:FindFirstChild("NPCs")
+	local shopRoot = workspace:FindFirstChild("NPCs")
 		and workspace.NPCs:FindFirstChild("Shop")
 		and workspace.NPCs.Shop:FindFirstChild("Bán băng gạc")
-	if not shop then
+	if not shopRoot then
 		return nil
 	end
-	for _, prompt in ipairs(shop:GetDescendants()) do
-		if prompt:IsA("ProximityPrompt") then
-			return prompt
+
+	local itemsFolder = shopRoot:FindFirstChild("Items")
+	if itemsFolder then
+		local bandageItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
+		if bandageItem then
+			local itemPrompt = bandageItem:FindFirstChildWhichIsA("ProximityPrompt", true)
+			if itemPrompt then
+				return itemPrompt
+			end
 		end
 	end
+
+	local directPrompt = shopRoot:FindFirstChildWhichIsA("ProximityPrompt")
+	if directPrompt then
+		return directPrompt
+	end
+
+	for _, node in ipairs(shopRoot:GetDescendants()) do
+		if node:IsA("ProximityPrompt") then
+			return node
+		end
+	end
+
 	return nil
+end
+
+local function getPromptWorldPosition(prompt)
+	local parent = prompt.Parent
+	if parent and parent:IsA("Attachment") and parent.Parent and parent.Parent:IsA("BasePart") then
+		return parent.Parent.Position
+	end
+	if parent and parent:IsA("BasePart") then
+		return parent.Position
+	end
+	if parent and parent:IsA("Model") then
+		return parent:GetPivot().Position
+	end
+	return nil
+end
+
+local function triggerPrompt(prompt)
+	local fired = false
+	pcall(function()
+		fireproximityprompt(prompt, 1, true)
+		fired = true
+	end)
+	if not fired then
+		pcall(function()
+			fireproximityprompt(prompt)
+			fired = true
+		end)
+	end
+	return fired
 end
 
 local function buyBandagePack(times)
 	if not fireproximityprompt then
 		return false
 	end
+
 	local prompt = findBandagePrompt()
 	if not prompt then
 		return false
 	end
-	times = math.max(1, times or 5)
-	for _ = 1, times do
+
+	local hrp = (lp.Character and lp.Character:FindFirstChild("HumanoidRootPart"))
+	local promptPosition = getPromptWorldPosition(prompt)
+	if hrp and promptPosition and (hrp.Position - promptPosition).Magnitude > 14 then
 		pcall(function()
-			fireproximityprompt(prompt)
+			hrp.CFrame = CFrame.new(promptPosition + Vector3.new(0, 2, 0))
 		end)
+		task.wait(0.1)
+	end
+
+	times = math.max(1, times or 5)
+	local success = false
+	for _ = 1, times do
+		if triggerPrompt(prompt) then
+			success = true
+		end
 		task.wait(0.2)
 	end
-	return true
+
+	return success
 end
 
 local function readBandageAmountFromTool(tool)
