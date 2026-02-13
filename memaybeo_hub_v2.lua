@@ -649,6 +649,16 @@ task.spawn(function()
 				continue
 			end
 
+			local currentBandages = countBandages()
+			if currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+				local needed = autoBandageMinCount - currentBandages
+				local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+				if buyBandagePack(buyTimes) then
+					lastBandageBuyAt = os.clock()
+					task.wait(0.3)
+				end
+			end
+
 			local current = char:FindFirstChildOfClass("Tool")
 			syncPreferredWeaponFromTool(current)
 			local heal = nil
