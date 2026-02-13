@@ -26,7 +26,7 @@ If you feel too lazy to build, I have provided the built version in the releases
 3. The executable script will be created as out.lua
 
 ## High Level Roadmap
-List of stuff that I planned do before I realized that I shouldn't be working on this anymore. If you are really interested in continuing this, you could add this stuff and make New MEMAYBEO HUB the ultimate utility that I wanted it to be. I might be forgetting stuff since I haven't worked on it for so long.
+List of stuff that I planned to do before I realized that I shouldn't be working on this anymore. If you are really interested in continuing this, you could add this stuff and make New MEMAYBEO HUB the ultimate utility that I wanted it to be. I might be forgetting stuff since I haven't worked on it for so long.
 - Terminal
 	* basically command interface with useful commands (non troll or gross) to get around
 	* each command has all its funcs, state contained in a table
@@ -34,7 +34,7 @@ List of stuff that I planned do before I realized that I shouldn't be working on
 	* more than just a remotespy
 	* you can choose to hook any metamethod, instance func/prop/event/callback, or any func
 	* logging args/returns of those funcs (like a remotespy)
-	* realtime editing of your hooks (allowing easy debugging: arg apoofing, return spoofing, unhook) using script editor
+	* realtime editing of your hooks (allowing easy debugging: arg spoofing, return spoofing, unhook) using script editor
 	* scripted filters
 	* save/load these configs
 	* default template would be set up to function like a remotespy
@@ -81,4 +81,4 @@ Certain features and extensions are private and are reserved for agency use. The
 
 ## Community Server
 If you would like to find more information (such as outdated docs), or talk to others interested in this script, you may join the server:<br>https://discord.gg/jnXFq2VBgU<br>
-Note that very limited to no support will be provided.
+Note that very limited support will be provided.
