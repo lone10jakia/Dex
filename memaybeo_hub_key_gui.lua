@@ -1054,55 +1054,55 @@ local function isBandageNodeName(name)
 	return (n:find("băng") and n:find("gạc")) or (n:find("bang") and n:find("gac")) or n:find("bandage")
 end
 
-local function findBandagePrompt()
-	local shopRoot = workspace:FindFirstChild("NPCs")
+local function getBandageShopRoot()
+	return workspace:FindFirstChild("NPCs")
 		and workspace.NPCs:FindFirstChild("Shop")
 		and workspace.NPCs.Shop:FindFirstChild("Bán băng gạc")
-	if not shopRoot then
-		return nil
-	end
+end
 
-	local itemsFolder = shopRoot:FindFirstChild("Items")
-	if itemsFolder then
-		local exactItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
-		if exactItem then
-			local exactPrompt = exactItem:FindFirstChildWhichIsA("ProximityPrompt", true)
-			if exactPrompt then
-				return exactPrompt
-			end
-		end
-
-		local firstItemPrompt = nil
-		for _, node in ipairs(itemsFolder:GetDescendants()) do
-			if node:IsA("ProximityPrompt") then
-				if not firstItemPrompt then
-					firstItemPrompt = node
-				end
-				local owner = node.Parent
-				if owner and isBandageNodeName(owner.Name) then
-					return node
-				end
-				if owner and owner.Parent and isBandageNodeName(owner.Parent.Name) then
-					return node
-				end
-			end
-		end
-		if firstItemPrompt then
-			return firstItemPrompt
-		end
-	end
-
+local function findShopEntryPrompt(shopRoot)
 	for _, node in ipairs(shopRoot:GetDescendants()) do
 		if node:IsA("ProximityPrompt") then
 			local owner = node.Parent
 			local ownerName = owner and string.lower(owner.Name) or ""
-			if not ownerName:find("shop") and not ownerName:find("cửa") and not ownerName:find("hang") then
+			if ownerName:find("shop") or ownerName:find("cửa") or ownerName:find("hang") or ownerName:find("mở") or ownerName:find("open") then
 				return node
 			end
 		end
 	end
-
 	return nil
+end
+
+local function findBandageItemPrompt(shopRoot)
+	local itemsFolder = shopRoot:FindFirstChild("Items")
+	if not itemsFolder then
+		return nil
+	end
+
+	local exactItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
+	if exactItem then
+		local exactPrompt = exactItem:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if exactPrompt then
+			return exactPrompt
+		end
+	end
+
+	local firstItemPrompt = nil
+	for _, node in ipairs(itemsFolder:GetDescendants()) do
+		if node:IsA("ProximityPrompt") then
+			if not firstItemPrompt then
+				firstItemPrompt = node
+			end
+			local owner = node.Parent
+			if owner and isBandageNodeName(owner.Name) then
+				return node
+			end
+			if owner and owner.Parent and isBandageNodeName(owner.Parent.Name) then
+				return node
+			end
+		end
+	end
+	return firstItemPrompt
 end
 
 local function getPromptWorldPosition(prompt)
@@ -1117,6 +1117,17 @@ local function getPromptWorldPosition(prompt)
 		return parent:GetPivot().Position
 	end
 	return nil
+end
+
+local function moveNearPrompt(prompt)
+	local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+	local promptPosition = getPromptWorldPosition(prompt)
+	if hrp and promptPosition and (hrp.Position - promptPosition).Magnitude > 14 then
+		pcall(function()
+			hrp.CFrame = CFrame.new(promptPosition + Vector3.new(0, 2, 0))
+		end)
+		task.wait(0.1)
+	end
 end
 
 local function triggerPrompt(prompt)
@@ -1139,24 +1150,32 @@ local function buyBandagePack(times)
 		return false
 	end
 
-	local prompt = findBandagePrompt()
-	if not prompt then
+	local shopRoot = getBandageShopRoot()
+	if not shopRoot then
 		return false
 	end
 
-	local hrp = (lp.Character and lp.Character:FindFirstChild("HumanoidRootPart"))
-	local promptPosition = getPromptWorldPosition(prompt)
-	if hrp and promptPosition and (hrp.Position - promptPosition).Magnitude > 14 then
-		pcall(function()
-			hrp.CFrame = CFrame.new(promptPosition + Vector3.new(0, 2, 0))
-		end)
+	local shopPrompt = findShopEntryPrompt(shopRoot)
+	local itemPrompt = findBandageItemPrompt(shopRoot)
+	if not itemPrompt then
+		return false
+	end
+
+	if shopPrompt then
+		moveNearPrompt(shopPrompt)
+		triggerPrompt(shopPrompt)
 		task.wait(0.1)
 	end
 
+	moveNearPrompt(itemPrompt)
 	times = math.max(1, times or 5)
 	local success = false
 	for _ = 1, times do
-		if triggerPrompt(prompt) then
+		if shopPrompt then
+			triggerPrompt(shopPrompt)
+			task.wait(0.05)
+		end
+		if triggerPrompt(itemPrompt) then
 			success = true
 		end
 		task.wait(0.2)
