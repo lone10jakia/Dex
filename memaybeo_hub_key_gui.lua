@@ -1164,6 +1164,49 @@ local function triggerPrompt(prompt)
 	return fired
 end
 
+local function clickButtonByText(textMatchers)
+	local playerGui = lp.PlayerGui
+	if not playerGui then
+		return false
+	end
+
+	for _, node in ipairs(playerGui:GetDescendants()) do
+		if node:IsA("TextButton") and node.Visible then
+			local txt = string.lower(node.Text or "")
+			for _, matcher in ipairs(textMatchers) do
+				if txt:find(matcher, 1, true) then
+					local ok = pcall(function()
+						node:Activate()
+					end)
+					if ok then
+						return true
+					end
+				end
+			end
+		end
+	end
+
+	return false
+end
+
+local function completeBandagePurchaseDialogs()
+	local confirmedQty = false
+	local bought = false
+	for _ = 1, 8 do
+		if not confirmedQty then
+			confirmedQty = clickButtonByText({ "xác nhận", "xac nhan" }) or confirmedQty
+		end
+		if not bought then
+			bought = clickButtonByText({ "mua" }) or bought
+		end
+		if confirmedQty and bought then
+			return true
+		end
+		task.wait(0.1)
+	end
+	return confirmedQty or bought
+end
+
 local function buyBandagePack(times)
 	if not fireproximityprompt then
 		return false
@@ -1191,9 +1234,15 @@ local function buyBandagePack(times)
 			if triggerPrompt(itemPrompt) then
 				success = true
 			end
+			if completeBandagePurchaseDialogs() then
+				success = true
+			end
 			task.wait(0.08)
 		end
 
+		if completeBandagePurchaseDialogs() then
+			success = true
+		end
 		task.wait(0.22)
 	end
 
