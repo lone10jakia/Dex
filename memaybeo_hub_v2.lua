@@ -61,7 +61,7 @@ ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 130, 0, 320)
+MainFrame.Size = UDim2.new(0, 130, 0, 380)
 MainFrame.Position = UDim2.new(1, 150, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Visible = false
@@ -101,10 +101,11 @@ local StunButton = makeButton(130, "🥴 Choáng:")
 local AutoAttackButton = makeButton(165, "⚔️ Auto Đánh:")
 local FixLagButton = makeButton(200, "⚡ FixLag:")
 local AutoBangButton = makeButton(235, "🤕 Auto Băng:")
+local AutoBuyBandageButton = makeButton(270, "🛒 Mua Băng:")
 
 local WeaponLabel = Instance.new("TextLabel")
 WeaponLabel.Size = UDim2.new(0, 110, 0, 16)
-WeaponLabel.Position = UDim2.new(0, 10, 0, 270)
+WeaponLabel.Position = UDim2.new(0, 10, 0, 305)
 WeaponLabel.BackgroundTransparency = 1
 WeaponLabel.Text = "🎯 Vũ khí:"
 WeaponLabel.TextSize = 12
@@ -115,7 +116,7 @@ WeaponLabel.Parent = MainFrame
 
 local WeaponInput = Instance.new("TextBox")
 WeaponInput.Size = UDim2.new(0, 110, 0, 24)
-WeaponInput.Position = UDim2.new(0, 10, 0, 288)
+WeaponInput.Position = UDim2.new(0, 10, 0, 323)
 WeaponInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 WeaponInput.Text = ""
 WeaponInput.PlaceholderText = "Tên vũ khí"
@@ -126,6 +127,17 @@ WeaponInput.ClearTextOnFocus = false
 WeaponInput.Parent = MainFrame
 Instance.new("UICorner", WeaponInput).CornerRadius = UDim.new(0, 5)
 
+local WeaponSelectButton = Instance.new("TextButton")
+WeaponSelectButton.Size = UDim2.new(0, 110, 0, 26)
+WeaponSelectButton.Position = UDim2.new(0, 10, 0, 351)
+WeaponSelectButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+WeaponSelectButton.TextSize = 11
+WeaponSelectButton.Font = Enum.Font.Gotham
+WeaponSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WeaponSelectButton.Parent = MainFrame
+Instance.new("UICorner", WeaponSelectButton).CornerRadius = UDim.new(0, 5)
+
 -- Variables
 local spinActive = persisted.spinActive or false
 local speedBoost = persisted.speedBoost or false
@@ -135,6 +147,10 @@ local stunBusy = false
 local autoAttack = persisted.autoAttack or false
 local fixLag = persisted.fixLag or false
 local autoBang = persisted.autoBang or false
+local autoBandageBuy = persisted.autoBandageBuy
+if autoBandageBuy == nil then
+	autoBandageBuy = true
+end
 local preferredWeaponName = persisted.preferredWeaponName or ""
 local autoWeaponCapture = persisted.autoWeaponCapture
 if autoWeaponCapture == nil then
@@ -145,6 +161,10 @@ local spinSpeed = 2500
 local normalSpeed, boostedSpeed = 16, 32
 local stunDuration = 0.6
 local stunSpeed = 8
+local autoBangThreshold = 75
+local autoBangCooldown = 0.4
+local autoBandageMinCount = 99
+local bandageBuyCooldown = 1.5
 
 local function persistState()
 	saveSettings({
@@ -155,6 +175,7 @@ local function persistState()
 		autoAttack = autoAttack,
 		fixLag = fixLag,
 		autoBang = autoBang,
+		autoBandageBuy = autoBandageBuy,
 		preferredWeaponName = preferredWeaponName,
 		autoWeaponCapture = autoWeaponCapture,
 	})
@@ -394,12 +415,18 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------------------
--- AUTO BĂNG CHUẨN <50 HP
+-- AUTO BĂNG CHUẨN <75 HP
 ------------------------------------------------------------------------
 
 AutoBangButton.MouseButton1Click:Connect(function()
 	autoBang = not autoBang
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
+	persistState()
+end)
+
+AutoBuyBandageButton.MouseButton1Click:Connect(function()
+	autoBandageBuy = not autoBandageBuy
+	setToggleText(AutoBuyBandageButton, "🛒 Mua Băng:", autoBandageBuy)
 	persistState()
 end)
 
@@ -443,7 +470,20 @@ local function syncPreferredWeaponFromTool(tool)
 
 	preferredWeaponName = tool.Name
 	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+end
+
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
 end
 
 local function waitForEquipped(char, tool, timeout)
@@ -457,12 +497,312 @@ local function waitForEquipped(char, tool, timeout)
 	return char:FindFirstChildOfClass("Tool") == tool
 end
 
+local function isBandageNodeName(name)
+	local n = string.lower(name or "")
+	return (n:find("băng") and n:find("gạc")) or (n:find("bang") and n:find("gac")) or n:find("bandage")
+end
+
+local function getBandageShopRoot()
+	return Workspace:FindFirstChild("NPCs")
+		and Workspace.NPCs:FindFirstChild("Shop")
+		and Workspace.NPCs.Shop:FindFirstChild("Bán băng gạc")
+end
+
+local function findShopEntryPrompt(shopRoot)
+	for _, node in ipairs(shopRoot:GetDescendants()) do
+		if node:IsA("ProximityPrompt") then
+			local owner = node.Parent
+			local ownerName = owner and string.lower(owner.Name) or ""
+			if ownerName:find("shop") or ownerName:find("cửa") or ownerName:find("hang") or ownerName:find("mở") or ownerName:find("open") then
+				return node
+			end
+		end
+	end
+	return nil
+end
+
+local function findBandageItemPrompts(shopRoot)
+	local itemsFolder = shopRoot:FindFirstChild("Items")
+	if not itemsFolder then
+		return {}
+	end
+
+	local prioritized = {}
+	local fallback = {}
+
+	local exactItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
+	if exactItem then
+		for _, node in ipairs(exactItem:GetDescendants()) do
+			if node:IsA("ProximityPrompt") then
+				table.insert(prioritized, node)
+			end
+		end
+	end
+
+	for _, node in ipairs(itemsFolder:GetDescendants()) do
+		if node:IsA("ProximityPrompt") then
+			local owner = node.Parent
+			local isBandageOwner = (owner and isBandageNodeName(owner.Name)) or (owner and owner.Parent and isBandageNodeName(owner.Parent.Name))
+			if isBandageOwner then
+				table.insert(prioritized, node)
+			else
+				table.insert(fallback, node)
+			end
+		end
+	end
+
+	local seen = {}
+	local result = {}
+	for _, prompt in ipairs(prioritized) do
+		if not seen[prompt] then
+			seen[prompt] = true
+			table.insert(result, prompt)
+		end
+	end
+	for _, prompt in ipairs(fallback) do
+		if not seen[prompt] then
+			seen[prompt] = true
+			table.insert(result, prompt)
+		end
+	end
+	return result
+end
+
+local function getPromptWorldPosition(prompt)
+	local parent = prompt.Parent
+	if parent and parent:IsA("Attachment") and parent.Parent and parent.Parent:IsA("BasePart") then
+		return parent.Parent.Position
+	end
+	if parent and parent:IsA("BasePart") then
+		return parent.Position
+	end
+	if parent and parent:IsA("Model") then
+		return parent:GetPivot().Position
+	end
+	return nil
+end
+
+local function moveNearPrompt(prompt)
+	local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local promptPosition = getPromptWorldPosition(prompt)
+	if hrp and promptPosition and (hrp.Position - promptPosition).Magnitude > 14 then
+		pcall(function()
+			hrp.CFrame = CFrame.new(promptPosition + Vector3.new(0, 2, 0))
+		end)
+		task.wait(0.1)
+	end
+end
+
+local function triggerPrompt(prompt)
+	local fired = false
+	for _, args in ipairs({
+		{ prompt, 0 },
+		{ prompt, 0.1 },
+		{ prompt, 1, true },
+		{ prompt },
+	}) do
+		local ok = pcall(function()
+			fireproximityprompt(table.unpack(args))
+		end)
+		if ok then
+			fired = true
+		end
+		task.wait(0.03)
+	end
+	return fired
+end
+
+local function clickButtonByText(textMatchers)
+	local playerGui = LocalPlayer.PlayerGui
+	if not playerGui then
+		return false
+	end
+
+	for _, node in ipairs(playerGui:GetDescendants()) do
+		if node:IsA("TextButton") and node.Visible then
+			local txt = string.lower(node.Text or "")
+			for _, matcher in ipairs(textMatchers) do
+				if txt:find(matcher, 1, true) then
+					local ok = pcall(function()
+						node:Activate()
+					end)
+					if ok then
+						return true
+					end
+				end
+			end
+		end
+	end
+
+	return false
+end
+
+local function completeBandagePurchaseDialogs()
+	local confirmedQty = false
+	local bought = false
+	for _ = 1, 8 do
+		if not confirmedQty then
+			confirmedQty = clickButtonByText({ "xác nhận", "xac nhan" }) or confirmedQty
+		end
+		if not bought then
+			bought = clickButtonByText({ "mua" }) or bought
+		end
+		if confirmedQty and bought then
+			return true
+		end
+		task.wait(0.1)
+	end
+	return confirmedQty or bought
+end
+
+local function buyBandagePack(times)
+	if not fireproximityprompt then
+		return false
+	end
+
+	times = math.max(1, times or 5)
+	local success = false
+
+	for _ = 1, times do
+		local shopRoot = getBandageShopRoot()
+		if not shopRoot then
+			break
+		end
+
+		local shopPrompt = findShopEntryPrompt(shopRoot)
+		if shopPrompt then
+			moveNearPrompt(shopPrompt)
+			triggerPrompt(shopPrompt)
+			task.wait(0.12)
+		end
+
+		local itemPrompts = findBandageItemPrompts(shopRoot)
+		for _, itemPrompt in ipairs(itemPrompts) do
+			moveNearPrompt(itemPrompt)
+			if triggerPrompt(itemPrompt) then
+				success = true
+			end
+			if completeBandagePurchaseDialogs() then
+				success = true
+			end
+			task.wait(0.08)
+		end
+
+		if completeBandagePurchaseDialogs() then
+			success = true
+		end
+		task.wait(0.22)
+	end
+
+	return success
+end
+
+local function isBandageTool(tool)
+	if not (tool and tool:IsA("Tool")) then
+		return false
+	end
+
+	local n = tool.Name:lower()
+	return n:find("băng gạc") or n:find("bang gac") or n:find("bandage")
+end
+
+local function readBandageAmountFromTool(tool)
+	local valueNames = { "Amount", "Count", "Stack", "Uses", "Value" }
+	for _, key in ipairs(valueNames) do
+		local child = tool:FindFirstChild(key)
+		if child and (child:IsA("IntValue") or child:IsA("NumberValue")) then
+			return child.Value
+		end
+	end
+
+	for _, key in ipairs(valueNames) do
+		local attr = tool:GetAttribute(key)
+		if type(attr) == "number" then
+			return attr
+		end
+	end
+
+	local digits = tool.Name:match("(%d+)")
+	if digits then
+		return tonumber(digits) or 1
+	end
+
+	return 1
+end
+
+local function countBandages()
+	local total = 0
+	local function collect(container)
+		for _, tool in ipairs(container:GetChildren()) do
+			if isBandageTool(tool) then
+				total += readBandageAmountFromTool(tool)
+			end
+		end
+	end
+
+	if LocalPlayer.Character then
+		collect(LocalPlayer.Character)
+	end
+	collect(LocalPlayer.Backpack)
+	return total
+end
+
+local lastHealAt = 0
+local healingInProgress = false
+local lastForceEquipAt = 0
+local postHealForceUntil = 0
+local lastBandageBuyAt = 0
+
+local function forcePreferredWeapon(char, hum)
+	if not char or not hum then
+		return
+	end
+	local preferred = findToolByName(preferredWeaponName)
+	if preferred then
+		hum:EquipTool(preferred)
+		waitForEquipped(char, preferred, 1.2)
+	end
+end
+
 task.spawn(function()
 	while task.wait(0.2) do
-		if autoBang and LocalPlayer.Character then
+		if (autoBang or autoBandageBuy) and LocalPlayer.Character and not healingInProgress then
 			local char = LocalPlayer.Character
 			local hum = char:FindFirstChildOfClass("Humanoid")
-			if not hum or hum.Health >= 50 then
+
+			local currentBandages = countBandages()
+			if autoBandageBuy and currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+				local needed = autoBandageMinCount - currentBandages
+				local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+				if buyBandagePack(buyTimes) then
+					lastBandageBuyAt = os.clock()
+					task.wait(0.3)
+				end
+			end
+
+			if hum and hum.Health >= hum.MaxHealth and os.clock() < postHealForceUntil then
+				local equipped = char:FindFirstChildOfClass("Tool")
+				if equipped and isHealTool(equipped) then
+					if os.clock() - lastForceEquipAt > 0.2 then
+						lastForceEquipAt = os.clock()
+						equipped.Parent = LocalPlayer.Backpack
+						forcePreferredWeapon(char, hum)
+					end
+				end
+			end
+			if not hum or hum.Health >= autoBangThreshold then
+				local currentTool = char:FindFirstChildOfClass("Tool")
+				if currentTool and isHealTool(currentTool) and hum and hum.Health >= hum.MaxHealth then
+					if os.clock() - lastForceEquipAt > 0.5 then
+						lastForceEquipAt = os.clock()
+						currentTool.Parent = LocalPlayer.Backpack
+						forcePreferredWeapon(char, hum)
+					end
+				end
+				continue
+			end
+
+			if os.clock() - lastHealAt < autoBangCooldown then
 				continue
 			end
 
@@ -489,19 +829,31 @@ task.spawn(function()
 				old = current
 			end
 
+			healingInProgress = true
 			hum:EquipTool(heal)
-			task.wait(0.2)
-			pcall(function()
-				heal:Activate()
-			end)
+			waitForEquipped(char, heal, 1)
+
+			local start = os.clock()
+			while autoBang and hum.Health < hum.MaxHealth and (os.clock() - start) < 6 do
+				pcall(function()
+					heal:Activate()
+				end)
+				task.wait(0.35)
+			end
+			lastHealAt = os.clock()
+			healingInProgress = false
+			postHealForceUntil = os.clock() + 3
 
 			local preferred = findToolByName(preferredWeaponName)
 			local returnTool = preferred or old
 			if returnTool then
-				task.defer(function()
-					hum:EquipTool(returnTool)
-					waitForEquipped(char, returnTool, 1.2)
-				end)
+				hum:EquipTool(returnTool)
+				waitForEquipped(char, returnTool, 1.2)
+			end
+			local equipped = char:FindFirstChildOfClass("Tool")
+			if equipped and isHealTool(equipped) then
+				equipped.Parent = LocalPlayer.Backpack
+				forcePreferredWeapon(char, hum)
 			end
 		end
 	end
@@ -510,6 +862,13 @@ end)
 LocalPlayer.CharacterAdded:Connect(function(char)
 	char.ChildAdded:Connect(function(child)
 		syncPreferredWeaponFromTool(child)
+		if autoBang and child:IsA("Tool") and isHealTool(child) then
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health >= hum.MaxHealth then
+				child.Parent = LocalPlayer.Backpack
+				forcePreferredWeapon(char, hum)
+			end
+		end
 	end)
 
 	if stunActive then
@@ -552,7 +911,11 @@ local function applyInitialState()
 	setToggleText(AutoAttackButton, "⚔️ Auto Đánh:", autoAttack)
 	setToggleText(FixLagButton, "⚡ FixLag:", fixLag)
 	setToggleText(AutoBangButton, "🤕 Auto Băng:", autoBang)
+	setToggleText(AutoBuyBandageButton, "🛒 Mua Băng:", autoBandageBuy)
 	WeaponInput.Text = preferredWeaponName
+	if preferredWeaponName ~= "" then
+		WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	end
 
 	if speedBoost then
 		applySpeed()
@@ -573,7 +936,40 @@ applyInitialState()
 
 WeaponInput.FocusLost:Connect(function()
 	preferredWeaponName = WeaponInput.Text
+	if preferredWeaponName ~= "" then
+		WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	else
+		WeaponLabel.Text = "🎯 Vũ khí:"
+	end
 	persistState()
+end)
+
+WeaponSelectButton.MouseButton1Click:Connect(function()
+	local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+	if not tool then
+		for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do
+			if v:IsA("Tool") and not isHealTool(v) then
+				tool = v
+				break
+			end
+		end
+	end
+
+	if setPreferredWeapon(tool) then
+		WeaponSelectButton.Text = "🎯 Đã lưu"
+		task.delay(0.8, function()
+			if WeaponSelectButton then
+				WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+			end
+		end)
+	else
+		WeaponSelectButton.Text = "❌ Không thấy"
+		task.delay(0.8, function()
+			if WeaponSelectButton then
+				WeaponSelectButton.Text = "🎯 Chọn vũ khí"
+			end
+		end)
+	end
 end)
 
 game:BindToClose(function()
