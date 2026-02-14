@@ -487,6 +487,18 @@ local function setPreferredWeapon(tool)
 	return true
 end
 
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
+end
+
 local function waitForEquipped(char, tool, timeout)
 	local deadline = os.clock() + timeout
 	while os.clock() < deadline do
@@ -522,36 +534,51 @@ local function findShopEntryPrompt(shopRoot)
 	return nil
 end
 
-local function findBandageItemPrompt(shopRoot)
+local function findBandageItemPrompts(shopRoot)
 	local itemsFolder = shopRoot:FindFirstChild("Items")
 	if not itemsFolder then
-		return nil
+		return {}
 	end
+
+	local prioritized = {}
+	local fallback = {}
 
 	local exactItem = itemsFolder:FindFirstChild("băng gạc") or itemsFolder:FindFirstChild("Băng gạc") or itemsFolder:FindFirstChild("bang gac")
 	if exactItem then
-		local exactPrompt = exactItem:FindFirstChildWhichIsA("ProximityPrompt", true)
-		if exactPrompt then
-			return exactPrompt
+		for _, node in ipairs(exactItem:GetDescendants()) do
+			if node:IsA("ProximityPrompt") then
+				table.insert(prioritized, node)
+			end
 		end
 	end
 
-	local firstItemPrompt = nil
 	for _, node in ipairs(itemsFolder:GetDescendants()) do
 		if node:IsA("ProximityPrompt") then
-			if not firstItemPrompt then
-				firstItemPrompt = node
-			end
 			local owner = node.Parent
-			if owner and isBandageNodeName(owner.Name) then
-				return node
-			end
-			if owner and owner.Parent and isBandageNodeName(owner.Parent.Name) then
-				return node
+			local isBandageOwner = (owner and isBandageNodeName(owner.Name)) or (owner and owner.Parent and isBandageNodeName(owner.Parent.Name))
+			if isBandageOwner then
+				table.insert(prioritized, node)
+			else
+				table.insert(fallback, node)
 			end
 		end
 	end
-	return firstItemPrompt
+
+	local seen = {}
+	local result = {}
+	for _, prompt in ipairs(prioritized) do
+		if not seen[prompt] then
+			seen[prompt] = true
+			table.insert(result, prompt)
+		end
+	end
+	for _, prompt in ipairs(fallback) do
+		if not seen[prompt] then
+			seen[prompt] = true
+			table.insert(result, prompt)
+		end
+	end
+	return result
 end
 
 local function getPromptWorldPosition(prompt)
@@ -581,15 +608,19 @@ end
 
 local function triggerPrompt(prompt)
 	local fired = false
-	pcall(function()
-		fireproximityprompt(prompt, 1, true)
-		fired = true
-	end)
-	if not fired then
-		pcall(function()
-			fireproximityprompt(prompt)
-			fired = true
+	for _, args in ipairs({
+		{ prompt, 0 },
+		{ prompt, 0.1 },
+		{ prompt, 1, true },
+		{ prompt },
+	}) do
+		local ok = pcall(function()
+			fireproximityprompt(table.unpack(args))
 		end)
+		if ok then
+			fired = true
+		end
+		task.wait(0.03)
 	end
 	return fired
 end
@@ -615,12 +646,13 @@ local function buyBandagePack(times)
 			task.wait(0.12)
 		end
 
-		local itemPrompt = findBandageItemPrompt(shopRoot)
-		if itemPrompt then
+		local itemPrompts = findBandageItemPrompts(shopRoot)
+		for _, itemPrompt in ipairs(itemPrompts) do
 			moveNearPrompt(itemPrompt)
 			if triggerPrompt(itemPrompt) then
 				success = true
 			end
+			task.wait(0.08)
 		end
 
 		task.wait(0.22)
@@ -731,6 +763,10 @@ task.spawn(function()
 						forcePreferredWeapon(char, hum)
 					end
 				end
+				continue
+			end
+
+			if os.clock() - lastHealAt < autoBangCooldown then
 				continue
 			end
 
