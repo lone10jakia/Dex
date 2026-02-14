@@ -1150,35 +1150,31 @@ local function buyBandagePack(times)
 		return false
 	end
 
-	local shopRoot = getBandageShopRoot()
-	if not shopRoot then
-		return false
-	end
-
-	local shopPrompt = findShopEntryPrompt(shopRoot)
-	local itemPrompt = findBandageItemPrompt(shopRoot)
-	if not itemPrompt then
-		return false
-	end
-
-	if shopPrompt then
-		moveNearPrompt(shopPrompt)
-		triggerPrompt(shopPrompt)
-		task.wait(0.1)
-	end
-
-	moveNearPrompt(itemPrompt)
 	times = math.max(1, times or 5)
 	local success = false
+
 	for _ = 1, times do
+		local shopRoot = getBandageShopRoot()
+		if not shopRoot then
+			break
+		end
+
+		local shopPrompt = findShopEntryPrompt(shopRoot)
 		if shopPrompt then
+			moveNearPrompt(shopPrompt)
 			triggerPrompt(shopPrompt)
-			task.wait(0.05)
+			task.wait(0.12)
 		end
-		if triggerPrompt(itemPrompt) then
-			success = true
+
+		local itemPrompt = findBandageItemPrompt(shopRoot)
+		if itemPrompt then
+			moveNearPrompt(itemPrompt)
+			if triggerPrompt(itemPrompt) then
+				success = true
+			end
 		end
-		task.wait(0.2)
+
+		task.wait(0.22)
 	end
 
 	return success
