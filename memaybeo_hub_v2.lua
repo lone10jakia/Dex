@@ -472,6 +472,19 @@ local function syncPreferredWeaponFromTool(tool)
 	WeaponInput.Text = preferredWeaponName
 	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
 	persistState()
+	return true
+end
+
+local function setPreferredWeapon(tool)
+	if not tool or not tool:IsA("Tool") or isHealTool(tool) then
+		return false
+	end
+
+	preferredWeaponName = tool.Name
+	WeaponInput.Text = preferredWeaponName
+	WeaponLabel.Text = "🎯 Vũ khí: " .. preferredWeaponName
+	persistState()
+	return true
 end
 
 local function setPreferredWeapon(tool)
@@ -755,6 +768,24 @@ task.spawn(function()
 
 			if os.clock() - lastHealAt < autoBangCooldown then
 				continue
+			end
+
+			if os.clock() - lastHealAt < autoBangCooldown then
+				continue
+			end
+
+			if os.clock() - lastHealAt < autoBangCooldown then
+				continue
+			end
+
+			local currentBandages = countBandages()
+			if currentBandages < autoBandageMinCount and (os.clock() - lastBandageBuyAt) > bandageBuyCooldown then
+				local needed = autoBandageMinCount - currentBandages
+				local buyTimes = math.clamp(math.ceil(needed / 5), 1, 20)
+				if buyBandagePack(buyTimes) then
+					lastBandageBuyAt = os.clock()
+					task.wait(0.3)
+				end
 			end
 
 			local current = char:FindFirstChildOfClass("Tool")
