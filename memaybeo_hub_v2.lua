@@ -612,6 +612,27 @@ local function triggerPrompt(prompt)
 	return fired
 end
 
+local function tryActivateButton(button)
+	local didClick = false
+	pcall(function()
+		button:Activate()
+		didClick = true
+	end)
+
+	if firesignal then
+		pcall(function()
+			firesignal(button.Activated)
+			didClick = true
+		end)
+		pcall(function()
+			firesignal(button.MouseButton1Click)
+			didClick = true
+		end)
+	end
+
+	return didClick
+end
+
 local function clickButtonByText(textMatchers)
 	local playerGui = LocalPlayer.PlayerGui
 	if not playerGui then
@@ -619,14 +640,39 @@ local function clickButtonByText(textMatchers)
 	end
 
 	for _, node in ipairs(playerGui:GetDescendants()) do
-		if node:IsA("TextButton") and node.Visible then
-			local txt = string.lower(node.Text or "")
+		if node:IsA("GuiButton") and node.Visible then
+			local candidates = { string.lower(node.Name or "") }
+			if node:IsA("TextButton") then
+				table.insert(candidates, string.lower(node.Text or ""))
+			end
+			for _, label in ipairs(node:GetDescendants()) do
+				if label:IsA("TextLabel") then
+					table.insert(candidates, string.lower(label.Text or ""))
+				end
+			end
+
+			for _, candidate in ipairs(candidates) do
+				for _, matcher in ipairs(textMatchers) do
+					if candidate:find(matcher, 1, true) then
+						if tryActivateButton(node) then
+							return true
+						end
+					end
+				end
+			end
+		end
+	end
+
+	for _, label in ipairs(playerGui:GetDescendants()) do
+		if label:IsA("TextLabel") and label.Visible then
+			local txt = string.lower(label.Text or "")
 			for _, matcher in ipairs(textMatchers) do
 				if txt:find(matcher, 1, true) then
-					local ok = pcall(function()
-						node:Activate()
-					end)
-					if ok then
+					local parent = label.Parent
+					while parent and not parent:IsA("GuiButton") do
+						parent = parent.Parent
+					end
+					if parent and tryActivateButton(parent) then
 						return true
 					end
 				end
@@ -640,17 +686,17 @@ end
 local function completeBandagePurchaseDialogs()
 	local confirmedQty = false
 	local bought = false
-	for _ = 1, 8 do
+	for _ = 1, 10 do
 		if not confirmedQty then
-			confirmedQty = clickButtonByText({ "xác nhận", "xac nhan" }) or confirmedQty
+			confirmedQty = clickButtonByText({ "xác nhận", "xac nhan", "confirm" }) or confirmedQty
 		end
 		if not bought then
-			bought = clickButtonByText({ "mua" }) or bought
+			bought = clickButtonByText({ "mua", "buy" }) or bought
 		end
 		if confirmedQty and bought then
 			return true
 		end
-		task.wait(0.1)
+		task.wait(0.12)
 	end
 	return confirmedQty or bought
 end
