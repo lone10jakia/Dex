@@ -154,7 +154,7 @@ local function createShield()
 	shieldModel.Name = "AbyssGuardianShield"
 	shieldModel.Parent = char
 
-	-- Barrier chính: bám theo người chơi => chặn thật
+	-- Barrier bám theo người chơi (không collision để tránh lỗi văng/lọt map)
 	local barrier = Instance.new("Part")
 	barrier.Name = "Barrier"
 	barrier.Shape = Enum.PartType.Cylinder
@@ -162,7 +162,7 @@ local function createShield()
 	barrier.Material = Enum.Material.ForceField
 	barrier.Color = Color3.fromRGB(95, 220, 255)
 	barrier.Transparency = 0.35
-	barrier.CanCollide = true
+	barrier.CanCollide = false
 	barrier.CanTouch = false
 	barrier.CanQuery = false
 	barrier.Massless = true
