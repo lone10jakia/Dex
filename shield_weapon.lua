@@ -22,7 +22,7 @@ local SHIELD_RADIUS = 7
 local SHIELD_HEIGHT = 6
 local SHIELD_DAMAGE = 60
 local SHIELD_COOLDOWN = 0.15
-local SHIELD_REPEL_FORCE = 145
+local SHIELD_REPEL_FORCE = 75
 local SHIELD_MIN_DISTANCE = 8
 local SHIELD_SCAN_RADIUS = 11
 
@@ -124,13 +124,10 @@ local function repelMonster(model, root)
 	end
 	local dir = flat.Unit
 
-	if flat.Magnitude < SHIELD_MIN_DISTANCE then
-		local newPos = root.Position + dir * SHIELD_MIN_DISTANCE + Vector3.new(0, 2, 0)
-		pcall(function() mr.CFrame = CFrame.new(newPos, newPos + dir) end)
-	end
-
+	-- Chỉ đẩy ngang, không teleport để tránh gây lỗi physics dây chuyền
 	pcall(function()
-		mr.AssemblyLinearVelocity = dir * SHIELD_REPEL_FORCE + Vector3.new(0, 12, 0)
+		local vel = mr.AssemblyLinearVelocity
+		mr.AssemblyLinearVelocity = Vector3.new(dir.X * SHIELD_REPEL_FORCE, math.max(vel.Y, 0), dir.Z * SHIELD_REPEL_FORCE)
 	end)
 end
 
@@ -168,10 +165,8 @@ local function createShield()
 	barrier.Massless = true
 	barrier.Parent = shieldModel
 
-	local barrierWeld = Instance.new("WeldConstraint")
-	barrierWeld.Part0 = root
-	barrierWeld.Part1 = barrier
-	barrierWeld.Parent = barrier
+	-- Dùng anchored follow thay vì weld để tránh bug văng/xuyên đất
+	barrier.Anchored = true
 	barrier.CFrame = root.CFrame * CFrame.new(0, SHIELD_HEIGHT * 0.5 - 1, 0) * CFrame.Angles(0, 0, math.rad(90))
 
 	local barrierLight = Instance.new("PointLight")
@@ -196,6 +191,14 @@ local function createShield()
 	shieldLoop = RunService.Heartbeat:Connect(function()
 		if not char.Parent or hum.Health <= 0 then
 			return
+		end
+
+		barrier.CFrame = root.CFrame * CFrame.new(0, SHIELD_HEIGHT * 0.5 - 1, 0) * CFrame.Angles(0, 0, math.rad(90))
+
+		-- Fail-safe: nếu tụt bất thường thì kéo lại ngay trên mặt đất
+		if root.Position.Y < -40 then
+			root.CFrame = CFrame.new(root.Position.X, 15, root.Position.Z)
+			root.AssemblyLinearVelocity = Vector3.zero
 		end
 
 		for _, part in ipairs(workspace:GetPartBoundsInRadius(root.Position, SHIELD_SCAN_RADIUS)) do
