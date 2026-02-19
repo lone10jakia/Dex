@@ -31,6 +31,8 @@ local WEAPON_NAME = "Abyss Reaver Ω"
 local WEAPON_DAMAGE = 1e6
 local WEAPON_RANGE = 38
 local WEAPON_COOLDOWN = 0.16
+local FINISHER_TICKS = 8
+local FINISHER_STEP = 0.05
 
 local shieldModel
 local shieldLoop
@@ -66,9 +68,25 @@ local function killHumanoid(humanoid)
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	pcall(function() humanoid:TakeDamage(WEAPON_DAMAGE) end)
-	pcall(function() humanoid.Health = 0 end)
-	pcall(function() if humanoid.Parent then humanoid.Parent:BreakJoints() end end)
+
+	for _ = 1, FINISHER_TICKS do
+		if humanoid.Health <= 0 then
+			break
+		end
+
+		pcall(function() humanoid:TakeDamage(WEAPON_DAMAGE) end)
+		pcall(function() humanoid.Health = 0 end)
+		pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Dead) end)
+		task.wait(FINISHER_STEP)
+	end
+
+	if humanoid.Health > 0 then
+		pcall(function()
+			if humanoid.Parent then
+				humanoid.Parent:BreakJoints()
+			end
+		end)
+	end
 end
 
 local function damageHumanoid(humanoid, amount)
@@ -211,6 +229,9 @@ local function createShield()
 					if now - last >= SHIELD_COOLDOWN then
 						shieldHitTime[enemyHum] = now
 						damageHumanoid(enemyHum, SHIELD_DAMAGE)
+						if enemyHum.Health > 0 and enemyHum.Health <= SHIELD_DAMAGE * 1.15 then
+							killHumanoid(enemyHum)
+						end
 					end
 					repelMonster(model, root)
 				end
@@ -219,10 +240,8 @@ local function createShield()
 	end)
 end
 
-local function findNearestTarget(origin)
-	local nearestHumanoid
-	local nearestRoot
-	local nearestDistance = WEAPON_RANGE
+local function findTargetsInRange(origin)
+	local targets = {}
 
 	for _, inst in ipairs(workspace:GetDescendants()) do
 		if inst:IsA("Humanoid") and inst.Health > 0 then
@@ -231,17 +250,19 @@ local function findNearestTarget(origin)
 				local r = monsterRoot(model)
 				if r then
 					local d = (r.Position - origin).Magnitude
-					if d <= nearestDistance then
-						nearestDistance = d
-						nearestHumanoid = inst
-						nearestRoot = r
+					if d <= WEAPON_RANGE then
+						table.insert(targets, {hum = inst, root = r, dist = d})
 					end
 				end
 			end
 		end
 	end
 
-	return nearestHumanoid, nearestRoot, nearestDistance
+	table.sort(targets, function(a, b)
+		return a.dist < b.dist
+	end)
+
+	return targets
 end
 
 local function styleWeapon(tool)
@@ -363,10 +384,12 @@ local function createWeapon()
 		local c = player.Character
 		local root = c and c:FindFirstChild("HumanoidRootPart")
 		if root then
-			local targetHum, targetRoot = findNearestTarget(root.Position)
-			if targetHum and targetRoot then
-				killHumanoid(targetHum)
-				createSlashEffect(root.Position, targetRoot.Position)
+			local targets = findTargetsInRange(root.Position)
+			if #targets > 0 then
+				for i = 1, math.min(3, #targets) do
+					killHumanoid(targets[i].hum)
+					createSlashEffect(root.Position, targets[i].root.Position)
+				end
 			end
 		end
 
