@@ -72,6 +72,10 @@ local autoHealConnection
 local autoHealTargetCFrame
 local autoHealThreshold = 25
 local autoHealCooldown = 0
+local npcShieldEnabled = false
+local npcShieldConnection
+local npcShieldRadius = 18
+local npcShieldForce = 120
 local aimParts = {"Head", "UpperTorso", "HumanoidRootPart"}
 local aimPartLabels = {
 	vi = {
@@ -170,6 +174,10 @@ local languageStrings = {
 		auto_heal_on = "Tự hồi máu 25%: BẬT",
 		auto_heal_off = "Tự hồi máu 25%: TẮT",
 		set_heal_spot = "Lưu vị trí hồi máu",
+		create_npc_weapon = "Tạo vũ khí diệt NPC",
+		npc_weapon_created = "Đã tạo vũ khí trong balo",
+		npc_shield_on = "Khiên đẩy NPC: BẬT",
+		npc_shield_off = "Khiên đẩy NPC: TẮT",
 		auto_on = "Tự ngắm: BẬT",
 		auto_off = "Tự ngắm: TẮT",
 		locator_on = "Định vị: BẬT",
@@ -270,6 +278,10 @@ local languageStrings = {
 		auto_heal_on = "Auto heal at 25%: ON",
 		auto_heal_off = "Auto heal at 25%: OFF",
 		set_heal_spot = "Save heal spot",
+		create_npc_weapon = "Create NPC killer weapon",
+		npc_weapon_created = "Weapon added to backpack",
+		npc_shield_on = "NPC repel shield: ON",
+		npc_shield_off = "NPC repel shield: OFF",
 		auto_on = "Auto aim: ON",
 		auto_off = "Auto aim: OFF",
 		locator_on = "Locator: ON",
@@ -550,6 +562,90 @@ local function updateAutoHeal(enable)
 		if humanoid and root and humanoid.Health > 0 and humanoid.Health <= autoHealThreshold then
 			root.CFrame = autoHealTargetCFrame
 			autoHealCooldown = 2
+		end
+	end)
+end
+
+local function getNpcModels()
+	local cityFolder = workspace:FindFirstChild("CityNPCs")
+	local npcFolder = cityFolder and cityFolder:FindFirstChild("NPCs")
+	if not npcFolder then
+		return {}
+	end
+	local npcs = {}
+	for _, npc in ipairs(npcFolder:GetChildren()) do
+		if npc:IsA("Model") then
+			table.insert(npcs, npc)
+		end
+	end
+	return npcs
+end
+
+local function createNpcWeapon()
+	local backpack = player:FindFirstChild("Backpack")
+	if not backpack then
+		return nil
+	end
+	local weapon = Instance.new("Tool")
+	weapon.Name = "NPC Slayer"
+	weapon.RequiresHandle = true
+	weapon.CanBeDropped = false
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1, 4, 1)
+	handle.Color = Color3.fromRGB(220, 45, 45)
+	handle.Material = Enum.Material.Neon
+	handle.CanCollide = false
+	handle.Massless = true
+	handle.Parent = weapon
+
+	weapon.Activated:Connect(function()
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return
+		end
+		for _, npc in ipairs(getNpcModels()) do
+			local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+			local humanoid = npc:FindFirstChildOfClass("Humanoid")
+			if npcRoot and humanoid and humanoid.Health > 0 then
+				if (npcRoot.Position - root.Position).Magnitude <= 18 then
+					humanoid.Health = 0
+				end
+			end
+		end
+	end)
+
+	weapon.Parent = backpack
+	return weapon
+end
+
+local function updateNpcShield(enable)
+	npcShieldEnabled = enable
+	if npcShieldConnection then
+		npcShieldConnection:Disconnect()
+		npcShieldConnection = nil
+	end
+	if not enable then
+		return
+	end
+	npcShieldConnection = RunService.Heartbeat:Connect(function()
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return
+		end
+		for _, npc in ipairs(getNpcModels()) do
+			local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+			if npcRoot then
+				local offset = npcRoot.Position - root.Position
+				local distance = offset.Magnitude
+				if distance > 0 and distance <= npcShieldRadius then
+					local pushDir = offset.Unit
+					npcRoot.AssemblyLinearVelocity = pushDir * npcShieldForce + Vector3.new(0, 20, 0)
+				end
+			end
 		end
 	end)
 end
@@ -1714,6 +1810,8 @@ local antiKickToggle = createButton(utilScroll, getText("antikick_off"))
 local collectNearbyButton = createButton(utilScroll, getText("collect_nearby"))
 local autoHealToggle = createButton(utilScroll, getText("auto_heal_off"))
 local setHealSpotButton = createButton(utilScroll, getText("set_heal_spot"))
+local createNpcWeaponButton = createButton(utilScroll, getText("create_npc_weapon"))
+local npcShieldToggle = createButton(utilScroll, getText("npc_shield_off"))
 
 npcFlyToggle.MouseButton1Click:Connect(function()
 	if npcFlyMode == "under" then
@@ -1865,6 +1963,23 @@ setHealSpotButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+createNpcWeaponButton.MouseButton1Click:Connect(function()
+	local weapon = createNpcWeapon()
+	if weapon then
+		createNpcWeaponButton.Text = getText("npc_weapon_created")
+		task.delay(1.5, function()
+			if createNpcWeaponButton and createNpcWeaponButton.Parent then
+				createNpcWeaponButton.Text = getText("create_npc_weapon")
+			end
+		end)
+	end
+end)
+
+npcShieldToggle.MouseButton1Click:Connect(function()
+	updateNpcShield(not npcShieldEnabled)
+	npcShieldToggle.Text = npcShieldEnabled and getText("npc_shield_on") or getText("npc_shield_off")
+end)
+
 -- PVP section (UI only)
 local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
 pvpSection.Size = UDim2.new(1, -24, 0, 250)
@@ -2009,6 +2124,8 @@ local function applyLanguage()
 	collectNearbyButton.Text = getText("collect_nearby")
 	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
 	setHealSpotButton.Text = getText("set_heal_spot")
+	createNpcWeaponButton.Text = getText("create_npc_weapon")
+	npcShieldToggle.Text = npcShieldEnabled and getText("npc_shield_on") or getText("npc_shield_off")
 
 	aimToggle.Text = autoAimEnabled and getText("auto_on") or getText("auto_off")
 	locatorToggle.Text = locatorEnabled and getText("locator_on") or getText("locator_off")
