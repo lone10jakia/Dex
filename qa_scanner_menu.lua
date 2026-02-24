@@ -2,7 +2,7 @@
 -- Menu chỉ tập trung auto trả lời câu hỏi bằng cách quét câu hỏi + đáp án trên màn hình.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -13,7 +13,8 @@ if playerGui:FindFirstChild("QAScannerMenu") then
 end
 
 local autoAnswerEnabled = false
-local autoAnswerConnection
+local autoAnswerLoopRunning = false
+local menuVisible = true
 local lastQuestionKey = ""
 local lastAnsweredText = ""
 local lastAnswerTime = 0
@@ -33,8 +34,31 @@ local semanticRules = {
 	},
 }
 
+local function removeVietnameseDiacritics(text)
+	local replaces = {
+		{"à", "a"}, {"á", "a"}, {"ả", "a"}, {"ã", "a"}, {"ạ", "a"},
+		{"ă", "a"}, {"ằ", "a"}, {"ắ", "a"}, {"ẳ", "a"}, {"ẵ", "a"}, {"ặ", "a"},
+		{"â", "a"}, {"ầ", "a"}, {"ấ", "a"}, {"ẩ", "a"}, {"ẫ", "a"}, {"ậ", "a"},
+		{"è", "e"}, {"é", "e"}, {"ẻ", "e"}, {"ẽ", "e"}, {"ẹ", "e"},
+		{"ê", "e"}, {"ề", "e"}, {"ế", "e"}, {"ể", "e"}, {"ễ", "e"}, {"ệ", "e"},
+		{"ì", "i"}, {"í", "i"}, {"ỉ", "i"}, {"ĩ", "i"}, {"ị", "i"},
+		{"ò", "o"}, {"ó", "o"}, {"ỏ", "o"}, {"õ", "o"}, {"ọ", "o"},
+		{"ô", "o"}, {"ồ", "o"}, {"ố", "o"}, {"ổ", "o"}, {"ỗ", "o"}, {"ộ", "o"},
+		{"ơ", "o"}, {"ờ", "o"}, {"ớ", "o"}, {"ở", "o"}, {"ỡ", "o"}, {"ợ", "o"},
+		{"ù", "u"}, {"ú", "u"}, {"ủ", "u"}, {"ũ", "u"}, {"ụ", "u"},
+		{"ư", "u"}, {"ừ", "u"}, {"ứ", "u"}, {"ử", "u"}, {"ữ", "u"}, {"ự", "u"},
+		{"ỳ", "y"}, {"ý", "y"}, {"ỷ", "y"}, {"ỹ", "y"}, {"ỵ", "y"},
+		{"đ", "d"},
+	}
+	for _, pair in ipairs(replaces) do
+		text = text:gsub(pair[1], pair[2])
+	end
+	return text
+end
+
 local function normalize(text)
 	text = tostring(text or ""):lower()
+	text = removeVietnameseDiacritics(text)
 	text = text:gsub("[%c%p]", " ")
 	text = text:gsub("%s+", " ")
 	return text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -461,9 +485,12 @@ local function hideMenuBriefly(seconds)
 	if not gui then
 		return
 	end
+	if not menuVisible then
+		return
+	end
 	gui.Enabled = false
 	task.delay(seconds or 1, function()
-		if gui and gui.Parent then
+		if gui and gui.Parent and menuVisible then
 			gui.Enabled = true
 		end
 	end)
@@ -663,25 +690,41 @@ local scanNowCorner = Instance.new("UICorner")
 scanNowCorner.CornerRadius = UDim.new(0, 8)
 scanNowCorner.Parent = scanNow
 
+local hideToggle = Instance.new("TextButton")
+hideToggle.Size = UDim2.new(0, 34, 0, 26)
+hideToggle.Position = UDim2.new(1, -44, 0, 8)
+hideToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 85)
+hideToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+hideToggle.Font = Enum.Font.GothamBold
+hideToggle.TextSize = 12
+hideToggle.Text = "ẨN"
+hideToggle.Parent = frame
+
+local hideToggleCorner = Instance.new("UICorner")
+hideToggleCorner.CornerRadius = UDim.new(0, 6)
+hideToggleCorner.Parent = hideToggle
+
 scanNow.MouseButton1Click:Connect(function()
 	autoAnswerStep(status)
 end)
 
 local function setAutoAnswer(state)
 	autoAnswerEnabled = state
-	if autoAnswerConnection then
-		autoAnswerConnection:Disconnect()
-		autoAnswerConnection = nil
-	end
 
 	if autoAnswerEnabled then
 		toggle.Text = "Tắt Auto Trả Lời"
 		toggle.BackgroundColor3 = Color3.fromRGB(220, 70, 95)
 		status.Text = "Đang tự động quét câu hỏi..."
-		autoAnswerConnection = RunService.Heartbeat:Connect(function()
-			autoAnswerStep(status)
-			task.wait(0.75)
-		end)
+		if not autoAnswerLoopRunning then
+			autoAnswerLoopRunning = true
+			task.spawn(function()
+				while autoAnswerEnabled and gui and gui.Parent do
+					autoAnswerStep(status)
+					task.wait(0.12)
+				end
+				autoAnswerLoopRunning = false
+			end)
+		end
 	else
 		toggle.Text = "Bật Auto Trả Lời"
 		toggle.BackgroundColor3 = Color3.fromRGB(65, 105, 225)
@@ -693,9 +736,25 @@ toggle.MouseButton1Click:Connect(function()
 	setAutoAnswer(not autoAnswerEnabled)
 end)
 
+hideToggle.MouseButton1Click:Connect(function()
+	menuVisible = not menuVisible
+	gui.Enabled = menuVisible
+	hideToggle.Text = menuVisible and "ẨN" or "HIỆN"
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.RightControl then
+		menuVisible = not menuVisible
+		gui.Enabled = menuVisible
+		hideToggle.Text = menuVisible and "ẨN" or "HIỆN"
+	end
+end)
+
 player.AncestryChanged:Connect(function(_, parent)
-	if not parent and autoAnswerConnection then
-		autoAnswerConnection:Disconnect()
-		autoAnswerConnection = nil
+	if not parent then
+		autoAnswerEnabled = false
 	end
 end)
