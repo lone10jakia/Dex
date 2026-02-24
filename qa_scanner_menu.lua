@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local gui
 
 if playerGui:FindFirstChild("QAScannerMenu") then
 	playerGui.QAScannerMenu:Destroy()
@@ -13,6 +14,9 @@ end
 
 local autoAnswerEnabled = false
 local autoAnswerConnection
+local lastQuestionKey = ""
+local lastAnsweredText = ""
+local lastAnswerTime = 0
 
 local questionAnswerRules = {
 	{question = "thu do viet nam", answer = "ha noi"},
@@ -51,13 +55,21 @@ end
 
 local function findVisibleQuestionLabel()
 	local bestLabel
-	local bestLength = 0
+	local bestScore = -1
 	for _, node in ipairs(playerGui:GetDescendants()) do
 		if node:IsA("TextLabel") and node.Visible and node.AbsoluteSize.Magnitude > 20 then
-			local txt = normalize(node.Text)
-			if txt ~= "" and (txt:find("?") or txt:find("cau hoi") or txt:find("question")) then
-				if #txt > bestLength then
-					bestLength = #txt
+			local rawText = tostring(node.Text or "")
+			local txt = normalize(rawText)
+			if txt ~= "" then
+				local score = 0
+				if rawText:find("%?") then score += 4 end
+				if rawText:find("=") then score += 5 end
+				if rawText:find("%%") then score += 5 end
+				if txt:find("cau hoi", 1, true) or txt:find("question", 1, true) then score += 2 end
+				if txt:find("so phan", 1, true) or txt:find("fraction", 1, true) then score += 3 end
+				score += math.min(#txt, 120) / 100
+				if score > bestScore then
+					bestScore = score
 					bestLabel = node
 				end
 			end
@@ -78,14 +90,14 @@ local function collectVisibleAnswerButtons(root)
 	end
 
 	for _, node in ipairs(parent:GetDescendants()) do
-		if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" then
+		if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" and (not gui or not node:IsDescendantOf(gui)) then
 			table.insert(result, node)
 		end
 	end
 
 	if #result == 0 then
 		for _, node in ipairs(playerGui:GetDescendants()) do
-			if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" then
+			if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" and (not gui or not node:IsDescendantOf(gui)) then
 				table.insert(result, node)
 			end
 		end
@@ -107,6 +119,52 @@ end
 local function chooseBestAnswer(questionText, buttons)
 	if #buttons == 0 then
 		return nil
+	end
+
+	local function parseNumericValue(text)
+		local cleaned = normalize(text):gsub(" ", "")
+		local a, b = cleaned:match("^(%-?%d+)%/(%-?%d+)$")
+		if a and b then
+			local den = tonumber(b)
+			if den and den ~= 0 then
+				return tonumber(a) / den
+			end
+		end
+		local pct = cleaned:match("^(%-?%d+%.?%d*)%%$")
+		if pct then
+			return tonumber(pct) / 100
+		end
+		local n = tonumber(cleaned)
+		if n then
+			return n
+		end
+		return nil
+	end
+
+	local questionTarget
+	local qPct = tostring(questionText or ""):match("(%-?%d+%.?%d*)%%")
+	if qPct then
+		questionTarget = tonumber(qPct) / 100
+	else
+		questionTarget = parseNumericValue(questionText)
+	end
+
+	if questionTarget then
+		local bestButton
+		local bestDelta = math.huge
+		for _, button in ipairs(buttons) do
+			local value = parseNumericValue(button.Text)
+			if value ~= nil then
+				local delta = math.abs(value - questionTarget)
+				if delta < bestDelta then
+					bestDelta = delta
+					bestButton = button
+				end
+			end
+		end
+		if bestButton then
+			return bestButton
+		end
 	end
 
 	local preferredAnswer = findRuleAnswer(questionText)
@@ -174,14 +232,23 @@ local function autoAnswerStep(statusLabel)
 		return
 	end
 
+	local questionKey = normalize(questionText)
+	if questionKey == lastQuestionKey and normalize(picked.Text) == lastAnsweredText and (time() - lastAnswerTime) < 1.2 then
+		statusLabel.Text = string.format("Đang chờ câu mới... (%s)", picked.Text)
+		return
+	end
+
 	if clickButton(picked) then
 		statusLabel.Text = string.format("Đã chọn: %s", picked.Text)
+		lastQuestionKey = questionKey
+		lastAnsweredText = normalize(picked.Text)
+		lastAnswerTime = time()
 	else
 		statusLabel.Text = "Không thể bấm đáp án."
 	end
 end
 
-local gui = Instance.new("ScreenGui")
+gui = Instance.new("ScreenGui")
 gui.Name = "QAScannerMenu"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
