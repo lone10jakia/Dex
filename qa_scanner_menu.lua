@@ -284,6 +284,24 @@ end
 
 local function extractQuestionTarget(questionText, questionLabel)
 	local raw = tostring(questionText or "")
+	local sequencePart = raw:match("([%d%s,%.%-]+%?)") or raw
+	local sequenceNumbers = {}
+	for n in sequencePart:gmatch("%-?%d+%.?%d*") do
+		table.insert(sequenceNumbers, tonumber(n))
+	end
+	if #sequenceNumbers >= 3 and raw:find("%?") then
+		local last = sequenceNumbers[#sequenceNumbers]
+		local prev = sequenceNumbers[#sequenceNumbers - 1]
+		local prev2 = sequenceNumbers[#sequenceNumbers - 2]
+		if last and prev and prev2 then
+			local d1 = last - prev
+			local d2 = prev - prev2
+			if math.abs(d1 - d2) <= 0.001 then
+				return last + d1
+			end
+		end
+	end
+
 	local pct = raw:match("(%-?%d+%.?%d*)%%")
 	if pct then
 		return tonumber(pct) / 100
@@ -402,6 +420,30 @@ local function collectVisibleAnswerButtons(root)
 		table.insert(picked, c)
 		if c.numeric ~= nil then
 			numericCount = numericCount + 1
+		end
+	end
+
+	local parentBuckets = {}
+	for _, c in ipairs(picked) do
+		local parent = c.node.Parent
+		parentBuckets[parent] = (parentBuckets[parent] or 0) + 1
+	end
+	local bestParent, bestParentCount = nil, -1
+	for parent, count in pairs(parentBuckets) do
+		if count > bestParentCount then
+			bestParentCount = count
+			bestParent = parent
+		end
+	end
+	if bestParent and bestParentCount >= 2 then
+		local parentFiltered = {}
+		for _, c in ipairs(picked) do
+			if c.node.Parent == bestParent then
+				table.insert(parentFiltered, c)
+			end
+		end
+		if #parentFiltered >= 2 then
+			picked = parentFiltered
 		end
 	end
 
