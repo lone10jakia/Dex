@@ -282,6 +282,34 @@ local function extractGeometryTarget(questionText, questionLabel)
 	return (a * b) / 2
 end
 
+local function findNearbyHintText(questionLabel)
+	if not questionLabel then
+		return ""
+	end
+	local qX = questionLabel.AbsolutePosition.X
+	local qY = questionLabel.AbsolutePosition.Y
+	local qW = questionLabel.AbsoluteSize.X
+	local qH = questionLabel.AbsoluteSize.Y
+
+	local best = ""
+	for _, node in ipairs(playerGui:GetDescendants()) do
+		if node:IsA("TextLabel") and node.Visible and (not gui or not node:IsDescendantOf(gui)) then
+			local text = tostring(node.Text or "")
+			local n = normalize(text)
+			if n:find("goi y", 1, true) or n:find("hint", 1, true) then
+				local cx = node.AbsolutePosition.X + node.AbsoluteSize.X / 2
+				local cy = node.AbsolutePosition.Y + node.AbsoluteSize.Y / 2
+				if cx >= qX - 300 and cx <= qX + qW + 300 and cy >= qY + qH and cy <= qY + qH + 420 then
+					if #text > #best then
+						best = text
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
 local function extractQuestionTarget(questionText, questionLabel)
 	local raw = tostring(questionText or "")
 	local sequencePart = raw:match("([%d%s,%.%-]+%?)") or raw
@@ -298,6 +326,32 @@ local function extractQuestionTarget(questionText, questionLabel)
 			local d2 = prev - prev2
 			if math.abs(d1 - d2) <= 0.001 then
 				return last + d1
+			end
+		end
+	end
+
+	if raw:find("%?") and #sequenceNumbers >= 2 then
+		local hintText = findNearbyHintText(questionLabel)
+		local hintDelta = hintText:match("thay doi%s*(%-?%d+%.?%d*)") or hintText:match("change%s*by%s*(%-?%d+%.?%d*)")
+		if hintDelta then
+			local delta = tonumber(hintDelta)
+			if delta then
+				return sequenceNumbers[#sequenceNumbers] + delta
+			end
+		end
+	end
+
+	local q = normalize(raw)
+	if q:find("lam tron", 1, true) or q:find("round", 1, true) then
+		local value = raw:match("(%-?%d+%.%d+)")
+		if value then
+			local n = tonumber(value)
+			if n then
+				if n >= 0 then
+					return math.floor(n + 0.5)
+				else
+					return math.ceil(n - 0.5)
+				end
 			end
 		end
 	end
@@ -361,7 +415,7 @@ local function getButtonDisplayText(node)
 	end
 	return best
 end
-local function collectVisibleAnswerButtons(root)
+local function collectVisibleAnswerButtons(root, questionText)
 	local result = {}
 	if not root then
 		return result
@@ -396,6 +450,9 @@ local function collectVisibleAnswerButtons(root)
 			if looksLikeGameAnswer(txt) then
 				local cX = node.AbsolutePosition.X + node.AbsoluteSize.X / 2
 				local cY = node.AbsolutePosition.Y + node.AbsoluteSize.Y / 2
+				if cY < qBottomY + 35 or cY > qBottomY + 430 or math.abs(cX - qCenterX) > 560 then
+					continue
+				end
 				local score = 0
 				local numeric = parseNumericValue(txt)
 				if numeric ~= nil then score = score + 10 end
@@ -481,6 +538,18 @@ local function collectVisibleAnswerButtons(root)
 	else
 		for _, c in ipairs(picked) do
 			table.insert(result, c.node)
+		end
+	end
+
+	if isLikelyMathQuestion(questionText or "") then
+		local numericOnly = {}
+		for _, button in ipairs(result) do
+			if parseNumericValue(getButtonDisplayText(button)) ~= nil then
+				table.insert(numericOnly, button)
+			end
+		end
+		if #numericOnly >= 2 then
+			result = numericOnly
 		end
 	end
 
@@ -651,7 +720,7 @@ local function autoAnswerStep(statusLabel)
 	end
 
 	local questionText = questionLabel.Text
-	local answerButtons = collectVisibleAnswerButtons(questionLabel)
+	local answerButtons = collectVisibleAnswerButtons(questionLabel, questionText)
 	local picked = chooseBestAnswer(questionText, questionLabel, answerButtons)
 	if not picked then
 		statusLabel.Text = "Không tìm thấy đáp án."
