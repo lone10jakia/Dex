@@ -26,6 +26,13 @@ local questionAnswerRules = {
 	{question = "largest planet", answer = "jupiter"},
 }
 
+local semanticRules = {
+	{
+		questionKeywords = {"goc", "angle"},
+		answerKeywords = {"phai", "phải", "vuong", "vuông", "right", "right angle"},
+	},
+}
+
 local function normalize(text)
 	text = tostring(text or ""):lower()
 	text = text:gsub("[%c%p]", " ")
@@ -332,7 +339,7 @@ local function collectVisibleAnswerButtons(root)
 		if t:match("^%-?%d+/%d+$") or t:match("^%-?%d+%%$") then
 			return true
 		end
-		return #t <= 16
+		return #t <= 32
 	end
 
 	local candidates = {}
@@ -419,6 +426,49 @@ local function findRuleAnswer(questionText)
 	return nil
 end
 
+local function buttonMatchesAnyKeyword(button, keywords)
+	local text = normalize(getButtonDisplayText(button))
+	for _, keyword in ipairs(keywords) do
+		if text:find(keyword, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function chooseBySemanticRules(questionText, buttons)
+	local q = normalize(questionText)
+	for _, rule in ipairs(semanticRules) do
+		local questionHit = false
+		for _, keyword in ipairs(rule.questionKeywords) do
+			if q:find(keyword, 1, true) then
+				questionHit = true
+				break
+			end
+		end
+		if questionHit then
+			for _, button in ipairs(buttons) do
+				if buttonMatchesAnyKeyword(button, rule.answerKeywords) then
+					return button
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function hideMenuBriefly(seconds)
+	if not gui then
+		return
+	end
+	gui.Enabled = false
+	task.delay(seconds or 1, function()
+		if gui and gui.Parent then
+			gui.Enabled = true
+		end
+	end)
+end
+
 local function chooseBestAnswer(questionText, questionLabel, buttons)
 	if #buttons == 0 then
 		return nil
@@ -454,6 +504,11 @@ local function chooseBestAnswer(questionText, questionLabel, buttons)
 		if bestButton then
 			return bestButton
 		end
+	end
+
+	local semanticPick = chooseBySemanticRules(questionText, buttons)
+	if semanticPick then
+		return semanticPick
 	end
 
 	local preferredAnswer = findRuleAnswer(questionText)
@@ -529,6 +584,7 @@ local function autoAnswerStep(statusLabel)
 	end
 
 	if clickButton(picked) then
+		hideMenuBriefly(1)
 		statusLabel.Text = string.format("Đã chọn: %s", pickedText)
 		lastQuestionKey = questionKey
 		lastAnsweredText = normalize(pickedText)
