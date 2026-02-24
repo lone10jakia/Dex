@@ -212,6 +212,23 @@ local function findVisibleQuestionLabel()
 	return bestLabel
 end
 
+
+
+local function getButtonDisplayText(node)
+	if node:IsA("TextButton") then
+		return tostring(node.Text or "")
+	end
+	local best = ""
+	for _, d in ipairs(node:GetDescendants()) do
+		if d:IsA("TextLabel") and d.Visible then
+			local txt = tostring(d.Text or "")
+			if #txt > #best then
+				best = txt
+			end
+		end
+	end
+	return best
+end
 local function collectVisibleAnswerButtons(root)
 	local result = {}
 	if not root then
@@ -234,7 +251,7 @@ local function collectVisibleAnswerButtons(root)
 		if parseNumericValue(t) ~= nil then
 			return true
 		end
-		if t:match("^%d+/%d+$") or t:match("^%d+%%$") then
+		if t:match("^%-?%d+/%d+$") or t:match("^%-?%d+%%$") then
 			return true
 		end
 		return #t <= 16
@@ -242,18 +259,20 @@ local function collectVisibleAnswerButtons(root)
 
 	local candidates = {}
 	for _, node in ipairs(playerGui:GetDescendants()) do
-		if node:IsA("TextButton") and node.Visible and (not gui or not node:IsDescendantOf(gui)) then
-			local txt = tostring(node.Text or "")
+		if (node:IsA("TextButton") or node:IsA("ImageButton")) and node.Visible and (not gui or not node:IsDescendantOf(gui)) then
+			local txt = getButtonDisplayText(node)
 			if looksLikeGameAnswer(txt) then
 				local cX = node.AbsolutePosition.X + node.AbsoluteSize.X / 2
 				local cY = node.AbsolutePosition.Y + node.AbsoluteSize.Y / 2
 				local score = 0
-				if parseNumericValue(txt) ~= nil then score = score + 8 end
-				if node.AbsoluteSize.X >= 70 and node.AbsoluteSize.Y >= 35 then score = score + 2 end
-				if cY > qBottomY then score = score + 2 else score = score - 2 end
-				score = score - math.abs(cX - qCenterX) / 220
-				score = score - math.abs(cY - (qBottomY + 120)) / 260
-				table.insert(candidates, {node = node, score = score})
+				local numeric = parseNumericValue(txt)
+				if numeric ~= nil then score = score + 10 end
+				if node.AbsoluteSize.X >= 90 and node.AbsoluteSize.Y >= 40 then score = score + 2 end
+				if cY > qBottomY then score = score + 2 else score = score - 3 end
+				-- ưu tiên cụm đáp án ngay bên dưới câu hỏi
+				score = score - math.abs(cY - (qBottomY + 150)) / 180
+				score = score - math.abs(cX - qCenterX) / 260
+				table.insert(candidates, {node = node, score = score, numeric = numeric, text = txt})
 			end
 		end
 	end
@@ -262,8 +281,26 @@ local function collectVisibleAnswerButtons(root)
 		return a.score > b.score
 	end)
 
-	for i = 1, math.min(8, #candidates) do
-		table.insert(result, candidates[i].node)
+	local picked = {}
+	local numericCount = 0
+	for i = 1, math.min(12, #candidates) do
+		local c = candidates[i]
+		table.insert(picked, c)
+		if c.numeric ~= nil then
+			numericCount = numericCount + 1
+		end
+	end
+
+	if numericCount >= 2 then
+		for _, c in ipairs(picked) do
+			if c.numeric ~= nil then
+				table.insert(result, c.node)
+			end
+		end
+	else
+		for _, c in ipairs(picked) do
+			table.insert(result, c.node)
+		end
 	end
 
 	return result
@@ -290,7 +327,7 @@ local function chooseBestAnswer(questionText, buttons)
 		local bestButton
 		local bestDelta = math.huge
 		for _, button in ipairs(buttons) do
-			local value = parseNumericValue(button.Text)
+			local value = parseNumericValue(getButtonDisplayText(button))
 			if value ~= nil then
 				local delta = math.abs(value - questionTarget)
 				if delta < bestDelta then
@@ -309,7 +346,7 @@ local function chooseBestAnswer(questionText, buttons)
 		local winner
 		local best = -1
 		for _, button in ipairs(buttons) do
-			local score = overlapScore(button.Text, preferredAnswer)
+			local score = overlapScore(getButtonDisplayText(button), preferredAnswer)
 			if score > best then
 				best = score
 				winner = button
@@ -323,7 +360,7 @@ local function chooseBestAnswer(questionText, buttons)
 	local fallback
 	local bestScore = -1
 	for _, button in ipairs(buttons) do
-		local score = overlapScore(questionText, button.Text)
+		local score = overlapScore(questionText, getButtonDisplayText(button))
 		if score > bestScore then
 			bestScore = score
 			fallback = button
@@ -370,15 +407,16 @@ local function autoAnswerStep(statusLabel)
 	end
 
 	local questionKey = normalize(questionText)
-	if questionKey == lastQuestionKey and normalize(picked.Text) == lastAnsweredText and (time() - lastAnswerTime) < 1.2 then
-		statusLabel.Text = string.format("Đang chờ câu mới... (%s)", picked.Text)
+	local pickedText = getButtonDisplayText(picked)
+	if questionKey == lastQuestionKey and normalize(pickedText) == lastAnsweredText and (time() - lastAnswerTime) < 1.2 then
+		statusLabel.Text = string.format("Đang chờ câu mới... (%s)", pickedText)
 		return
 	end
 
 	if clickButton(picked) then
-		statusLabel.Text = string.format("Đã chọn: %s", picked.Text)
+		statusLabel.Text = string.format("Đã chọn: %s", pickedText)
 		lastQuestionKey = questionKey
-		lastAnsweredText = normalize(picked.Text)
+		lastAnsweredText = normalize(pickedText)
 		lastAnswerTime = time()
 	else
 		statusLabel.Text = "Không thể bấm đáp án."
