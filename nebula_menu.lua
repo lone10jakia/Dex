@@ -1,4 +1,4 @@
--- Fancy Multi-Function Menu
+-- NEBULA CORE Menu (new file)
 -- Standalone Roblox LocalScript-style UI
 
 local Players = game:GetService("Players")
@@ -11,8 +11,8 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-if playerGui:FindFirstChild("FancyMenu") then
-	playerGui.FancyMenu:Destroy()
+if playerGui:FindFirstChild("NebulaMenu") then
+	playerGui.NebulaMenu:Destroy()
 end
 
 local theme = {
@@ -90,7 +90,7 @@ local hitboxEnabled = false
 local hitboxConnection
 local hitboxOriginals = {}
 local currentLanguage = "vi"
-local configKey = "_FancyMenuConfig"
+local configKey = "_NebulaMenuConfig"
 local savedConfig = rawget(_G, configKey)
 
 local languageStrings = {
@@ -1279,7 +1279,7 @@ local function ensureSilentAimHook()
 end
 
 local screenGui = create("ScreenGui", {
-	Name = "FancyMenu",
+	Name = "NebulaMenu",
 	ResetOnSpawn = false,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	IgnoreGuiInset = true,
