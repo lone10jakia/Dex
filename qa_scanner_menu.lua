@@ -53,6 +53,140 @@ local function overlapScore(a, b)
 	return score
 end
 
+
+
+local function parseNumericValue(text)
+	local cleaned = normalize(text):gsub(" ", "")
+	local a, b = cleaned:match("^(%-?%d+)%/(%-?%d+)$")
+	if a and b then
+		local den = tonumber(b)
+		if den and den ~= 0 then
+			return tonumber(a) / den
+		end
+	end
+	local pct = cleaned:match("^(%-?%d+%.?%d*)%%$")
+	if pct then
+		return tonumber(pct) / 100
+	end
+	local n = tonumber(cleaned)
+	if n then
+		return n
+	end
+	return nil
+end
+
+local function tokenizeExpression(expr)
+	local tokens = {}
+	local i = 1
+	while i <= #expr do
+		local ch = expr:sub(i, i)
+		if ch:match("%s") then
+			i = i + 1
+		elseif ch:match("[%+%-%*/%(%)]") then
+			table.insert(tokens, ch)
+			i = i + 1
+		else
+			local num = expr:match("^%d+%.?%d*", i) or expr:match("^%.%d+", i)
+			if not num then
+				return nil
+			end
+			table.insert(tokens, tonumber(num))
+			i = i + #num
+		end
+	end
+	return tokens
+end
+
+local function evaluateExpression(expr)
+	if type(expr) ~= "string" or expr == "" then
+		return nil
+	end
+	local tokens = tokenizeExpression(expr)
+	if not tokens or #tokens == 0 then
+		return nil
+	end
+	local pos = 1
+	local parseExpr, parseTerm, parseFactor
+	local function cur() return tokens[pos] end
+	parseFactor = function()
+		local t = cur()
+		if t == nil then return nil end
+		if t == "(" then
+			pos = pos + 1
+			local v = parseExpr()
+			if cur() ~= ")" then return nil end
+			pos = pos + 1
+			return v
+		elseif t == "+" then
+			pos = pos + 1
+			return parseFactor()
+		elseif t == "-" then
+			pos = pos + 1
+			local v = parseFactor()
+			return v and -v or nil
+		elseif type(t) == "number" then
+			pos = pos + 1
+			return t
+		end
+		return nil
+	end
+	parseTerm = function()
+		local v = parseFactor()
+		if v == nil then return nil end
+		while true do
+			local t = cur()
+			if t == "*" or t == "/" then
+				pos = pos + 1
+				local rhs = parseFactor()
+				if rhs == nil then return nil end
+				if t == "*" then
+					v = v * rhs
+				else
+					if rhs == 0 then return nil end
+					v = v / rhs
+				end
+			else
+				break
+			end
+		end
+		return v
+	end
+	parseExpr = function()
+		local v = parseTerm()
+		if v == nil then return nil end
+		while true do
+			local t = cur()
+			if t == "+" or t == "-" then
+				pos = pos + 1
+				local rhs = parseTerm()
+				if rhs == nil then return nil end
+				if t == "+" then v = v + rhs else v = v - rhs end
+			else
+				break
+			end
+		end
+		return v
+	end
+	local result = parseExpr()
+	if result == nil or pos <= #tokens then return nil end
+	return result
+end
+
+local function extractQuestionTarget(questionText)
+	local raw = tostring(questionText or "")
+	local pct = raw:match("(%-?%d+%.?%d*)%%")
+	if pct then
+		return tonumber(pct) / 100
+	end
+	local leftExpr = raw:match("([%d%.%s%+%-%*/%(%)]+)%s*=%s*%?+")
+	if leftExpr then
+		local calc = evaluateExpression(leftExpr)
+		if calc ~= nil then
+			return calc
+		end
+	end
+	return parseNumericValue(raw)
+end
 local function findVisibleQuestionLabel()
 	local bestLabel
 	local bestScore = -1
@@ -84,23 +218,52 @@ local function collectVisibleAnswerButtons(root)
 		return result
 	end
 
-	local parent = root.Parent
-	if not parent then
-		return result
-	end
+	local qCenterX = root.AbsolutePosition.X + root.AbsoluteSize.X / 2
+	local qBottomY = root.AbsolutePosition.Y + root.AbsoluteSize.Y
 
-	for _, node in ipairs(parent:GetDescendants()) do
-		if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" and (not gui or not node:IsDescendantOf(gui)) then
-			table.insert(result, node)
+	local function looksLikeGameAnswer(text)
+		local t = normalize(text)
+		if t == "" then
+			return false
 		end
+		if t:find("cua hang", 1, true) or t:find("cai dat", 1, true) or t:find("danh gia", 1, true)
+			or t:find("chon cau hoi", 1, true) or t:find("nhay", 1, true) or t:find("auto", 1, true)
+			or t:find("quet", 1, true) or t:find("menu", 1, true) then
+			return false
+		end
+		if parseNumericValue(t) ~= nil then
+			return true
+		end
+		if t:match("^%d+/%d+$") or t:match("^%d+%%$") then
+			return true
+		end
+		return #t <= 16
 	end
 
-	if #result == 0 then
-		for _, node in ipairs(playerGui:GetDescendants()) do
-			if node:IsA("TextButton") and node.Visible and normalize(node.Text) ~= "" and (not gui or not node:IsDescendantOf(gui)) then
-				table.insert(result, node)
+	local candidates = {}
+	for _, node in ipairs(playerGui:GetDescendants()) do
+		if node:IsA("TextButton") and node.Visible and (not gui or not node:IsDescendantOf(gui)) then
+			local txt = tostring(node.Text or "")
+			if looksLikeGameAnswer(txt) then
+				local cX = node.AbsolutePosition.X + node.AbsoluteSize.X / 2
+				local cY = node.AbsolutePosition.Y + node.AbsoluteSize.Y / 2
+				local score = 0
+				if parseNumericValue(txt) ~= nil then score = score + 8 end
+				if node.AbsoluteSize.X >= 70 and node.AbsoluteSize.Y >= 35 then score = score + 2 end
+				if cY > qBottomY then score = score + 2 else score = score - 2 end
+				score = score - math.abs(cX - qCenterX) / 220
+				score = score - math.abs(cY - (qBottomY + 120)) / 260
+				table.insert(candidates, {node = node, score = score})
 			end
 		end
+	end
+
+	table.sort(candidates, function(a, b)
+		return a.score > b.score
+	end)
+
+	for i = 1, math.min(8, #candidates) do
+		table.insert(result, candidates[i].node)
 	end
 
 	return result
@@ -121,33 +284,7 @@ local function chooseBestAnswer(questionText, buttons)
 		return nil
 	end
 
-	local function parseNumericValue(text)
-		local cleaned = normalize(text):gsub(" ", "")
-		local a, b = cleaned:match("^(%-?%d+)%/(%-?%d+)$")
-		if a and b then
-			local den = tonumber(b)
-			if den and den ~= 0 then
-				return tonumber(a) / den
-			end
-		end
-		local pct = cleaned:match("^(%-?%d+%.?%d*)%%$")
-		if pct then
-			return tonumber(pct) / 100
-		end
-		local n = tonumber(cleaned)
-		if n then
-			return n
-		end
-		return nil
-	end
-
-	local questionTarget
-	local qPct = tostring(questionText or ""):match("(%-?%d+%.?%d*)%%")
-	if qPct then
-		questionTarget = tonumber(qPct) / 100
-	else
-		questionTarget = parseNumericValue(questionText)
-	end
+	local questionTarget = extractQuestionTarget(questionText)
 
 	if questionTarget then
 		local bestButton
