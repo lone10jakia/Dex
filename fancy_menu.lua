@@ -16,13 +16,13 @@ if playerGui:FindFirstChild("FancyMenu") then
 end
 
 local theme = {
-	background = Color3.fromRGB(22, 24, 30),
-	panel = Color3.fromRGB(30, 33, 41),
-	panelDark = Color3.fromRGB(25, 27, 34),
-	accent = Color3.fromRGB(96, 165, 250),
-	text = Color3.fromRGB(235, 238, 245),
-	muted = Color3.fromRGB(155, 160, 175),
-	stroke = Color3.fromRGB(55, 60, 75),
+	background = Color3.fromRGB(7, 12, 20),
+	panel = Color3.fromRGB(15, 23, 36),
+	panelDark = Color3.fromRGB(10, 17, 28),
+	accent = Color3.fromRGB(34, 211, 238),
+	text = Color3.fromRGB(236, 246, 255),
+	muted = Color3.fromRGB(148, 177, 201),
+	stroke = Color3.fromRGB(45, 84, 116),
 }
 
 local autoAimEnabled = false
@@ -112,8 +112,8 @@ local languageStrings = {
 		key_unlock = "Mở khóa",
 		key_success = "Đã xác thực.",
 		key_invalid = "Sai mã. Thử lại.",
-		menu_title = "MEMAYBEO HUB Menu đa chức năng",
-		hint = "Nhấn RightShift để ẩn/hiện menu",
+		menu_title = "AURORA HUB Menu mới",
+		hint = "Nhấn RightShift để bật/tắt AURORA HUB",
 		status_idle = "Trạng thái: Sẵn sàng",
 		status_locator_off = "Trạng thái: Tắt định vị",
 		status_locator_on = "Trạng thái: Đang định vị...",
@@ -170,6 +170,10 @@ local languageStrings = {
 		auto_heal_on = "Tự hồi máu 25%: BẬT",
 		auto_heal_off = "Tự hồi máu 25%: TẮT",
 		set_heal_spot = "Lưu vị trí hồi máu",
+		calc_input = "Phép tính (vd: (2+3)*4)",
+		calc_button = "Tính kết quả",
+		calc_result = "Kết quả: %s",
+		calc_invalid = "Kết quả: Biểu thức không hợp lệ",
 		auto_on = "Tự ngắm: BẬT",
 		auto_off = "Tự ngắm: TẮT",
 		locator_on = "Định vị: BẬT",
@@ -212,8 +216,8 @@ local languageStrings = {
 		key_unlock = "Unlock",
 		key_success = "Access granted.",
 		key_invalid = "Invalid key. Try again.",
-		menu_title = "MEMAYBEO HUB Multi-Function Menu",
-		hint = "Press RightShift to toggle menu",
+		menu_title = "AURORA HUB New Interface",
+		hint = "Press RightShift to toggle AURORA HUB",
 		status_idle = "Status: Ready",
 		status_locator_off = "Status: Locator Off",
 		status_locator_on = "Status: Locating players...",
@@ -270,6 +274,10 @@ local languageStrings = {
 		auto_heal_on = "Auto heal at 25%: ON",
 		auto_heal_off = "Auto heal at 25%: OFF",
 		set_heal_spot = "Save heal spot",
+		calc_input = "Expression (ex: (2+3)*4)",
+		calc_button = "Calculate",
+		calc_result = "Result: %s",
+		calc_invalid = "Result: Invalid expression",
 		auto_on = "Auto aim: ON",
 		auto_off = "Auto aim: OFF",
 		locator_on = "Locator: ON",
@@ -303,6 +311,148 @@ end
 local function getText(key)
 	local lang = languageStrings[currentLanguage] or languageStrings.vi
 	return lang[key] or key
+end
+
+local function tokenizeMathExpression(expression)
+	local tokens = {}
+	local i = 1
+	while i <= #expression do
+		local ch = expression:sub(i, i)
+		if ch:match("%s") then
+			i = i + 1
+		elseif ch:match("[%+%-%*/%(%)%^]") then
+			table.insert(tokens, ch)
+			i = i + 1
+		else
+			local numberText = expression:match("^%d+%.?%d*", i) or expression:match("^%.%d+", i)
+			if numberText then
+				table.insert(tokens, tonumber(numberText))
+				i = i + #numberText
+			else
+				return nil
+			end
+		end
+	end
+	return tokens
+end
+
+local function evaluateMathExpression(expression)
+	if type(expression) ~= "string" or expression == "" then
+		return nil
+	end
+
+	local tokens = tokenizeMathExpression(expression)
+	if not tokens or #tokens == 0 then
+		return nil
+	end
+
+	local position = 1
+	local parseExpression, parseTerm, parseFactor
+
+	local function currentToken()
+		return tokens[position]
+	end
+
+	parseFactor = function()
+		local token = currentToken()
+		if token == nil then
+			return nil
+		end
+		if token == "(" then
+			position = position + 1
+			local value = parseExpression()
+			if currentToken() ~= ")" then
+				return nil
+			end
+			position = position + 1
+			return value
+		elseif token == "+" then
+			position = position + 1
+			return parseFactor()
+		elseif token == "-" then
+			position = position + 1
+			local value = parseFactor()
+			if value == nil then
+				return nil
+			end
+			return -value
+		elseif type(token) == "number" then
+			position = position + 1
+			local value = token
+			if currentToken() == "^" then
+				position = position + 1
+				local exponent = parseFactor()
+				if exponent == nil then
+					return nil
+				end
+				value = value ^ exponent
+			end
+			return value
+		end
+		return nil
+	end
+
+	parseTerm = function()
+		local value = parseFactor()
+		if value == nil then
+			return nil
+		end
+		while true do
+			local token = currentToken()
+			if token == "*" or token == "/" then
+				position = position + 1
+				local rhs = parseFactor()
+				if rhs == nil then
+					return nil
+				end
+				if token == "*" then
+					value = value * rhs
+				else
+					if rhs == 0 then
+						return nil
+					end
+					value = value / rhs
+				end
+			else
+				break
+			end
+		end
+		return value
+	end
+
+	parseExpression = function()
+		local value = parseTerm()
+		if value == nil then
+			return nil
+		end
+		while true do
+			local token = currentToken()
+			if token == "+" or token == "-" then
+				position = position + 1
+				local rhs = parseTerm()
+				if rhs == nil then
+					return nil
+				end
+				if token == "+" then
+					value = value + rhs
+				else
+					value = value - rhs
+				end
+			else
+				break
+			end
+		end
+		return value
+	end
+
+	local result = parseExpression()
+	if result == nil or position <= #tokens then
+		return nil
+	end
+	if result ~= result or result == math.huge or result == -math.huge then
+		return nil
+	end
+	return result
 end
 
 local function getNpcRoot()
@@ -1262,8 +1412,8 @@ create("UICorner", {
 
 local main = create("Frame", {
 	Name = "Main",
-	Size = UDim2.new(0, 520, 0, 340),
-	Position = UDim2.new(0.5, -260, 0.5, -170),
+	Size = UDim2.new(0, 760, 0, 460),
+	Position = UDim2.new(0.5, -380, 0.5, -230),
 	BackgroundColor3 = theme.panel,
 	BorderSizePixel = 0,
 	Visible = false,
@@ -1271,7 +1421,7 @@ local main = create("Frame", {
 })
 
 create("UICorner", {
-	CornerRadius = UDim.new(0, 14),
+	CornerRadius = UDim.new(0, 18),
 	Parent = main,
 })
 
@@ -1281,9 +1431,19 @@ create("UIStroke", {
 	Parent = main,
 })
 
+create("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 34, 52)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(9, 18, 30)),
+	}),
+	Rotation = 120,
+	Parent = main,
+})
+
 local topBar = create("Frame", {
 	Name = "TopBar",
-	Size = UDim2.new(1, 0, 0, 48),
+	Size = UDim2.new(1, -12, 0, 62),
+	Position = UDim2.new(0, 6, 0, 6),
 	BackgroundColor3 = theme.panelDark,
 	BorderSizePixel = 0,
 	Parent = main,
@@ -1341,22 +1501,36 @@ create("UICorner", {
 	Parent = minimizeButton,
 })
 
-local tabBar = create("ScrollingFrame", {
-	Name = "TabBar",
-	Size = UDim2.new(0, 160, 1, -48),
-	Position = UDim2.new(0, 0, 0, 48),
+local sidePanel = create("Frame", {
+	Name = "SidePanel",
+	Size = UDim2.new(0, 190, 1, -84),
+	Position = UDim2.new(0, 10, 0, 74),
 	BackgroundColor3 = theme.panelDark,
 	BorderSizePixel = 0,
-	ScrollBarThickness = 4,
-	ScrollBarImageColor3 = theme.stroke,
-	CanvasSize = UDim2.new(0, 0, 0, 0),
 	Parent = main,
+})
+
+create("UICorner", {
+	CornerRadius = UDim.new(0, 14),
+	Parent = sidePanel,
 })
 
 create("UIStroke", {
 	Color = theme.stroke,
 	Thickness = 1,
-	Parent = tabBar,
+	Parent = sidePanel,
+})
+
+local tabBar = create("ScrollingFrame", {
+	Name = "TabBar",
+	Size = UDim2.new(1, -16, 1, -100),
+	Position = UDim2.new(0, 8, 0, 88),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 4,
+	ScrollBarImageColor3 = theme.stroke,
+	CanvasSize = UDim2.new(0, 0, 0, 0),
+	Parent = sidePanel,
 })
 
 local tabList = create("UIListLayout", {
@@ -1366,26 +1540,19 @@ local tabList = create("UIListLayout", {
 })
 
 tabList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	tabBar.CanvasSize = UDim2.new(0, 0, 0, tabList.AbsoluteContentSize.Y + 20)
+	tabBar.CanvasSize = UDim2.new(0, 0, 0, tabList.AbsoluteContentSize.Y + 16)
 end)
-
-create("UIPadding", {
-	PaddingTop = UDim.new(0, 12),
-	PaddingLeft = UDim.new(0, 10),
-	PaddingRight = UDim.new(0, 10),
-	Parent = tabBar,
-})
 
 local content = create("Frame", {
 	Name = "Content",
-	Size = UDim2.new(1, -160, 1, -48),
-	Position = UDim2.new(0, 160, 0, 48),
+	Size = UDim2.new(1, -220, 1, -84),
+	Position = UDim2.new(0, 210, 0, 74),
 	BackgroundTransparency = 1,
 	Parent = main,
 })
 
 local fullSize = main.Size
-local minimizedSize = UDim2.new(0, 520, 0, 48)
+local minimizedSize = UDim2.new(0, 760, 0, 68)
 
 local function applyMinimizeState()
 	if minimized then
@@ -1408,11 +1575,11 @@ end
 local heroArt = create("ImageLabel", {
 	Name = "HeroArt",
 	BackgroundTransparency = 1,
-	Size = UDim2.new(0, 110, 0, 110),
-	Position = UDim2.new(0, 16, 0, 12),
+	Size = UDim2.new(1, -16, 0, 72),
+	Position = UDim2.new(0, 8, 0, 8),
 	Image = animeImageId,
 	ScaleType = Enum.ScaleType.Crop,
-	Parent = tabBar,
+	Parent = sidePanel,
 })
 
 create("UICorner", {
@@ -1714,6 +1881,18 @@ local antiKickToggle = createButton(utilScroll, getText("antikick_off"))
 local collectNearbyButton = createButton(utilScroll, getText("collect_nearby"))
 local autoHealToggle = createButton(utilScroll, getText("auto_heal_off"))
 local setHealSpotButton = createButton(utilScroll, getText("set_heal_spot"))
+local calcInput = createInput(utilScroll, getText("calc_input"))
+local calcButton = createButton(utilScroll, getText("calc_button"))
+local calcResultLabel = create("TextLabel", {
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -24, 0, 20),
+	Font = Enum.Font.Gotham,
+	Text = string.format(getText("calc_result"), "0"),
+	TextSize = 12,
+	TextColor3 = theme.muted,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	Parent = utilScroll,
+})
 
 npcFlyToggle.MouseButton1Click:Connect(function()
 	if npcFlyMode == "under" then
@@ -1865,6 +2044,15 @@ setHealSpotButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+calcButton.MouseButton1Click:Connect(function()
+	local result = evaluateMathExpression(calcInput.Text)
+	if result == nil then
+		calcResultLabel.Text = getText("calc_invalid")
+		return
+	end
+	calcResultLabel.Text = string.format(getText("calc_result"), string.format("%.6f", result):gsub("0+$", ""):gsub("%.$", ""))
+end)
+
 -- PVP section (UI only)
 local pvpSection, pvpSectionTitle = createSection(pvpPage, getText("section_pvp"))
 pvpSection.Size = UDim2.new(1, -24, 0, 250)
@@ -2009,6 +2197,16 @@ local function applyLanguage()
 	collectNearbyButton.Text = getText("collect_nearby")
 	autoHealToggle.Text = autoHealEnabled and getText("auto_heal_on") or getText("auto_heal_off")
 	setHealSpotButton.Text = getText("set_heal_spot")
+	calcInput.PlaceholderText = getText("calc_input")
+	calcButton.Text = getText("calc_button")
+	local calcPreview = evaluateMathExpression(calcInput.Text)
+	if calcPreview ~= nil then
+		calcResultLabel.Text = string.format(getText("calc_result"), string.format("%.6f", calcPreview):gsub("0+$", ""):gsub("%.$", ""))
+	elseif calcInput.Text == "" then
+		calcResultLabel.Text = string.format(getText("calc_result"), "0")
+	else
+		calcResultLabel.Text = getText("calc_invalid")
+	end
 
 	aimToggle.Text = autoAimEnabled and getText("auto_on") or getText("auto_off")
 	locatorToggle.Text = locatorEnabled and getText("locator_on") or getText("locator_off")
@@ -2172,7 +2370,7 @@ end)
 
 local function setVisible(state)
 	if state then
-		main.Position = UDim2.new(0.5, -260, 0.5, -170)
+		main.Position = UDim2.new(0.5, -380, 0.5, -230)
 	end
 	main.Visible = state
 	if state then
