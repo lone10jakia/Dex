@@ -172,7 +172,81 @@ local function evaluateExpression(expr)
 	return result
 end
 
-local function extractQuestionTarget(questionText)
+local function isLikelyMathQuestion(questionText)
+	local q = normalize(questionText)
+	if q:find("dien tich", 1, true) or q:find("area", 1, true) or q:find("fraction", 1, true)
+		or q:find("phan", 1, true) then
+		return true
+	end
+	if tostring(questionText or ""):find("[%d][%s]*[%+%-%*/=][%s]*[%d]") then
+		return true
+	end
+	return tostring(questionText or ""):find("%d") ~= nil
+end
+
+local function extractGeometryTarget(questionText, questionLabel)
+	local q = normalize(questionText)
+	if not (q:find("dien tich", 1, true) or q:find("area", 1, true) or q:find("shape", 1, true) or q:find("hinh", 1, true)) then
+		return nil
+	end
+	if not questionLabel then
+		return nil
+	end
+
+	local xMin = questionLabel.AbsolutePosition.X - 260
+	local xMax = questionLabel.AbsolutePosition.X + questionLabel.AbsoluteSize.X + 260
+	local yMin = questionLabel.AbsolutePosition.Y - 20
+	local yMax = questionLabel.AbsolutePosition.Y + 220
+
+	local nums = {}
+	local freq = {}
+	for _, node in ipairs(playerGui:GetDescendants()) do
+		if node:IsA("TextLabel") and node.Visible and (not gui or not node:IsDescendantOf(gui)) then
+			local text = tostring(node.Text or "")
+			if #text <= 4 and text:match("^%s*%-?%d+%.?%d*%s*$") then
+				local cx = node.AbsolutePosition.X + node.AbsoluteSize.X / 2
+				local cy = node.AbsolutePosition.Y + node.AbsoluteSize.Y / 2
+				if cx >= xMin and cx <= xMax and cy >= yMin and cy <= yMax then
+					local v = tonumber(text)
+					if v and math.abs(v) <= 1000 and node.AbsoluteSize.X >= 8 and node.AbsoluteSize.Y >= 8 then
+						table.insert(nums, v)
+						freq[v] = (freq[v] or 0) + 1
+					end
+				end
+			end
+		end
+	end
+
+	if #nums < 2 then
+		return nil
+	end
+
+	table.sort(nums)
+
+	local frequent = {}
+	for value, count in pairs(freq) do
+		table.insert(frequent, {value = value, count = count})
+	end
+	table.sort(frequent, function(a, b)
+		if a.count == b.count then
+			return math.abs(a.value) < math.abs(b.value)
+		end
+		return a.count > b.count
+	end)
+
+	local a, b
+	if #frequent >= 2 then
+		a, b = frequent[1].value, frequent[2].value
+	elseif #frequent == 1 then
+		a, b = frequent[1].value, frequent[1].value
+	else
+		a, b = nums[1], nums[2]
+	end
+
+	return (a * b) / 2
+end
+
+local function extractQuestionTarget(questionText, questionLabel)
 	local raw = tostring(questionText or "")
 	local pct = raw:match("(%-?%d+%.?%d*)%%")
 	if pct then
@@ -184,6 +258,10 @@ local function extractQuestionTarget(questionText)
 		if calc ~= nil then
 			return calc
 		end
+	end
+	local geometry = extractGeometryTarget(questionText, questionLabel)
+	if geometry ~= nil then
+		return geometry
 	end
 	return parseNumericValue(raw)
 end
@@ -272,7 +350,7 @@ local function collectVisibleAnswerButtons(root)
 				-- ưu tiên cụm đáp án ngay bên dưới câu hỏi
 				score = score - math.abs(cY - (qBottomY + 150)) / 180
 				score = score - math.abs(cX - qCenterX) / 260
-				table.insert(candidates, {node = node, score = score, numeric = numeric, text = txt})
+				table.insert(candidates, {node = node, score = score, numeric = numeric, text = txt, y = cY})
 			end
 		end
 	end
@@ -288,6 +366,31 @@ local function collectVisibleAnswerButtons(root)
 		table.insert(picked, c)
 		if c.numeric ~= nil then
 			numericCount = numericCount + 1
+		end
+	end
+
+	local rowBuckets = {}
+	for _, c in ipairs(picked) do
+		local bucket = math.floor(c.y / 35 + 0.5)
+		rowBuckets[bucket] = (rowBuckets[bucket] or 0) + 1
+	end
+	local bestBucket, bestCount = nil, -1
+	for bucket, count in pairs(rowBuckets) do
+		if count > bestCount then
+			bestCount = count
+			bestBucket = bucket
+		end
+	end
+	if bestBucket then
+		local rowFiltered = {}
+		for _, c in ipairs(picked) do
+			local bucket = math.floor(c.y / 35 + 0.5)
+			if math.abs(bucket - bestBucket) <= 1 then
+				table.insert(rowFiltered, c)
+			end
+		end
+		if #rowFiltered >= 2 then
+			picked = rowFiltered
 		end
 	end
 
@@ -316,12 +419,24 @@ local function findRuleAnswer(questionText)
 	return nil
 end
 
-local function chooseBestAnswer(questionText, buttons)
+local function chooseBestAnswer(questionText, questionLabel, buttons)
 	if #buttons == 0 then
 		return nil
 	end
 
-	local questionTarget = extractQuestionTarget(questionText)
+	if isLikelyMathQuestion(questionText) then
+		local numericButtons = {}
+		for _, button in ipairs(buttons) do
+			if parseNumericValue(getButtonDisplayText(button)) ~= nil then
+				table.insert(numericButtons, button)
+			end
+		end
+		if #numericButtons >= 2 then
+			buttons = numericButtons
+		end
+	end
+
+	local questionTarget = extractQuestionTarget(questionText, questionLabel)
 
 	if questionTarget then
 		local bestButton
@@ -400,7 +515,7 @@ local function autoAnswerStep(statusLabel)
 
 	local questionText = questionLabel.Text
 	local answerButtons = collectVisibleAnswerButtons(questionLabel)
-	local picked = chooseBestAnswer(questionText, answerButtons)
+	local picked = chooseBestAnswer(questionText, questionLabel, answerButtons)
 	if not picked then
 		statusLabel.Text = "Không tìm thấy đáp án."
 		return
