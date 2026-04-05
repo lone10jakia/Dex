@@ -86,6 +86,8 @@ local aimPartLabels = {
 	},
 }
 local aimPartIndex = 1
+local targetModes = {"players", "npcs", "both"}
+local targetModeIndex = 1
 local hitboxEnabled = false
 local hitboxConnection
 local hitboxOriginals = {}
@@ -123,7 +125,7 @@ local languageStrings = {
 		status_target_blocked = "Trạng thái: Mục tiêu bị che",
 		status_locked = "Trạng thái: Khóa %s (%.0fm)",
 		status_no_target = "Trạng thái: Không có mục tiêu",
-		no_enemy = "Không tìm thấy người chơi phù hợp.",
+		no_enemy = "Không tìm thấy mục tiêu phù hợp.",
 		status_locate_fail = "Trạng thái: Không thể định vị.",
 		status_target_fail = "Trạng thái: Không thể xác định vị trí.",
 		status_nearest = "Trạng thái: Gần nhất %s (%.0fm)",
@@ -189,6 +191,10 @@ local languageStrings = {
 		headmagnet_on = "Hút đầu: BẬT",
 		headmagnet_off = "Hút đầu: TẮT",
 		aim_part = "Vị trí ngắm: %s",
+		target_mode = "Mục tiêu: %s",
+		target_players = "Người chơi",
+		target_npcs = "NPC",
+		target_both = "Người + NPC",
 		hitbox_on = "Vùng trúng: BẬT",
 		hitbox_off = "Vùng trúng: TẮT",
 		ping = "Ping gần nhất",
@@ -227,7 +233,7 @@ local languageStrings = {
 		status_target_blocked = "Status: Target blocked",
 		status_locked = "Status: Locked %s (%.0fm)",
 		status_no_target = "Status: No target",
-		no_enemy = "No suitable player found.",
+		no_enemy = "No suitable target found.",
 		status_locate_fail = "Status: Unable to locate.",
 		status_target_fail = "Status: Cannot resolve target.",
 		status_nearest = "Status: Nearest %s (%.0fm)",
@@ -293,6 +299,10 @@ local languageStrings = {
 		headmagnet_on = "Head magnet: ON",
 		headmagnet_off = "Head magnet: OFF",
 		aim_part = "Aim part: %s",
+		target_mode = "Target: %s",
+		target_players = "Players",
+		target_npcs = "NPCs",
+		target_both = "Players + NPCs",
 		hitbox_on = "Hitbox: ON",
 		hitbox_off = "Hitbox: OFF",
 		ping = "Ping Nearest",
@@ -725,6 +735,12 @@ local function applySavedConfig()
 	if type(savedConfig.aimPartIndex) == "number" then
 		aimPartIndex = math.max(1, math.min(#aimParts, savedConfig.aimPartIndex))
 	end
+	if type(savedConfig.targetMode) == "string" then
+		local modeIndex = table.find(targetModes, savedConfig.targetMode)
+		if modeIndex then
+			targetModeIndex = modeIndex
+		end
+	end
 end
 
 local function create(className, props)
@@ -788,12 +804,7 @@ local function getHeadPart(targetPlayer)
 	return nil
 end
 
-local function getAimPart(targetPlayer)
-	if not targetPlayer then
-		return nil
-	end
-
-	local character = targetPlayer.Character
+local function getAimPartFromCharacter(character)
 	if not character then
 		return nil
 	end
@@ -809,10 +820,99 @@ local function getAimPart(targetPlayer)
 		return part
 	end
 
-	return getHeadPart(targetPlayer)
+	local head = character:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		return head
+	end
+
+	local primary = character.PrimaryPart
+	if primary and primary:IsA("BasePart") then
+		return primary
+	end
+
+	return nil
 end
 
-local function getCandidatePlayers()
+local function getAimPart(targetPlayer)
+	if not targetPlayer then
+		return nil
+	end
+	return getAimPartFromCharacter(targetPlayer.Character)
+end
+
+local function getNpcCandidates()
+	local npcFolders = {}
+	local cityFolder = workspace:FindFirstChild("CityNPCs")
+	if cityFolder then
+		local cityNpcs = cityFolder:FindFirstChild("NPCs")
+		if cityNpcs then
+			table.insert(npcFolders, cityNpcs)
+		end
+	end
+	local genericNpcs = workspace:FindFirstChild("NPCs")
+	if genericNpcs then
+		table.insert(npcFolders, genericNpcs)
+	end
+
+	local candidates = {}
+	for _, folder in ipairs(npcFolders) do
+		for _, npc in ipairs(folder:GetChildren()) do
+			if npc:IsA("Model") and getAimPartFromCharacter(npc) then
+				table.insert(candidates, npc)
+			end
+		end
+	end
+
+	return candidates
+end
+
+local function getCurrentTargetMode()
+	return targetModes[targetModeIndex] or "players"
+end
+
+local function getTargetModeLabel()
+	local mode = getCurrentTargetMode()
+	if mode == "npcs" then
+		return getText("target_npcs")
+	end
+	if mode == "both" then
+		return getText("target_both")
+	end
+	return getText("target_players")
+end
+
+local getCandidatePlayers
+
+local function getTargetCandidates()
+	local mode = getCurrentTargetMode()
+	local candidates = {}
+
+	if mode == "players" or mode == "both" then
+		for _, other in ipairs(getCandidatePlayers()) do
+			table.insert(candidates, {
+				kind = "player",
+				name = other.Name,
+				instance = other,
+				part = getAimPart(other),
+			})
+		end
+	end
+
+	if mode == "npcs" or mode == "both" then
+		for _, npc in ipairs(getNpcCandidates()) do
+			table.insert(candidates, {
+				kind = "npc",
+				name = npc.Name,
+				instance = npc,
+				part = getAimPartFromCharacter(npc),
+			})
+		end
+	end
+
+	return candidates
+end
+
+getCandidatePlayers = function()
 	local candidates = {}
 	for _, other in ipairs(Players:GetPlayers()) do
 		if other ~= player then
@@ -825,7 +925,7 @@ local function getCandidatePlayers()
 	return candidates
 end
 
-local function getNearestPlayer()
+local function getNearestTarget()
 	local root = getRoot()
 	local origin = root and root.Position
 	if not origin then
@@ -833,27 +933,32 @@ local function getNearestPlayer()
 		origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
 	end
 
-	local nearest
+	local nearestTarget
 	local nearestDistance
-	for _, other in ipairs(getCandidatePlayers()) do
-		local part = getAimPart(other)
+	for _, candidate in ipairs(getTargetCandidates()) do
+		local part = candidate.part
 		if part then
 			local distance = (part.Position - origin).Magnitude
 			if not nearestDistance or distance < nearestDistance then
-				nearest = other
+				nearestTarget = candidate
 				nearestDistance = distance
 			end
 		end
 	end
 
-	if not nearest then
+	if not nearestTarget then
 		return nil, getText("no_enemy")
 	end
 
-	return nearest, nearestDistance
+	return nearestTarget, nearestDistance
 end
 
-local function createLocatorBillboard(targetPlayer, head)
+local function createLocatorBillboard(targetInfo)
+	local head = targetInfo.part
+	if not head then
+		return nil
+	end
+
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "FancyLocator"
 	billboard.Size = UDim2.new(0, 160, 0, 34)
@@ -885,14 +990,14 @@ local function createLocatorBillboard(targetPlayer, head)
 		Size = UDim2.new(1, -8, 1, 0),
 		Position = UDim2.new(0, 4, 0, 0),
 		Font = Enum.Font.GothamBold,
-		Text = targetPlayer.Name,
+		Text = targetInfo.name,
 		TextSize = 12,
 		TextColor3 = theme.text,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = frame,
 	})
 
-	locatorBillboards[targetPlayer] = billboard
+	locatorBillboards[targetInfo.instance] = billboard
 	return label
 end
 
@@ -933,24 +1038,31 @@ local function setLocatorEnabled(enabled, statusLabel)
 			origin = camera and camera.CFrame.Position or Vector3.new(0, 0, 0)
 		end
 
-		local candidates = getCandidatePlayers()
-			for _, other in ipairs(candidates) do
-				local part = getAimPart(other)
+		local candidates = getTargetCandidates()
+			for _, targetInfo in ipairs(candidates) do
+				local part = targetInfo.part
 				if part then
-					if not locatorBillboards[other] or not locatorBillboards[other].Parent then
-						createLocatorBillboard(other, part)
+					if not locatorBillboards[targetInfo.instance] or not locatorBillboards[targetInfo.instance].Parent then
+						createLocatorBillboard(targetInfo)
 					end
-					local billboard = locatorBillboards[other]
+					local billboard = locatorBillboards[targetInfo.instance]
 					local label = billboard and billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("NameLabel")
 					if label then
 						local distance = (part.Position - origin).Magnitude
-						label.Text = string.format("%s • %.0fm", other.Name, distance)
+						label.Text = string.format("%s • %.0fm", targetInfo.name, distance)
 					end
 				end
 		end
 
 		for target, billboard in pairs(locatorBillboards) do
-			if not table.find(candidates, target) then
+			local stillExists = false
+			for _, candidate in ipairs(candidates) do
+				if candidate.instance == target then
+					stillExists = true
+					break
+				end
+			end
+			if not stillExists then
 				if billboard then
 					billboard:Destroy()
 				end
@@ -1009,8 +1121,8 @@ local function setAutoAim(enabled, statusLabel)
 			return
 		end
 
-		local target, distanceOrError = getNearestPlayer()
-		if not target then
+		local targetInfo, distanceOrError = getNearestTarget()
+		if not targetInfo then
 			if statusLabel then
 				if distanceOrError then
 					statusLabel.Text = distanceOrError
@@ -1021,7 +1133,7 @@ local function setAutoAim(enabled, statusLabel)
 			return
 		end
 
-		local part = getAimPart(target)
+		local part = targetInfo.part
 		if not part then
 			return
 		end
@@ -1048,7 +1160,7 @@ local function setAutoAim(enabled, statusLabel)
 
 		camera.CFrame = CFrame.lookAt(camera.CFrame.Position, part.Position)
 		if statusLabel then
-			setStatusLabel(statusLabel, "status_locked", target.Name, distanceOrError)
+			setStatusLabel(statusLabel, "status_locked", targetInfo.name, distanceOrError)
 		end
 	end)
 end
@@ -1247,8 +1359,8 @@ local function ensureSilentAimHook()
 			local rayParams = args[3]
 
 			if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-				local target, _ = getNearestPlayer()
-				local part = target and getAimPart(target)
+				local targetInfo, _ = getNearestTarget()
+				local part = targetInfo and targetInfo.part
 				if part then
 					if not wallbangEnabled and workspace and workspace.Raycast then
 						local rayParams = RaycastParams.new()
@@ -2142,6 +2254,8 @@ local silentAimToggle = createButton(pvpBody, getText("headmagnet_off"))
 
 local aimPartToggle = createButton(pvpBody, string.format(getText("aim_part"), getAimPartLabel()))
 
+local targetModeToggle = createButton(pvpBody, string.format(getText("target_mode"), getTargetModeLabel()))
+
 local hitboxToggle = createButton(pvpBody, getText("hitbox_off"))
 
 local pingButton = createButton(pvpBody, getText("ping"))
@@ -2248,6 +2362,7 @@ local function applyLanguage()
 	fastReloadToggle.Text = fastReloadEnabled and getText("reload_on") or getText("reload_off")
 	silentAimToggle.Text = silentAimEnabled and getText("headmagnet_on") or getText("headmagnet_off")
 	aimPartToggle.Text = string.format(getText("aim_part"), getAimPartLabel())
+	targetModeToggle.Text = string.format(getText("target_mode"), getTargetModeLabel())
 	hitboxToggle.Text = hitboxEnabled and getText("hitbox_on") or getText("hitbox_off")
 	pingButton.Text = getText("ping")
 
@@ -2269,6 +2384,7 @@ local function saveConfig()
 		fastReloadEnabled = fastReloadEnabled,
 		silentAimEnabled = silentAimEnabled,
 		aimPartIndex = aimPartIndex,
+		targetMode = getCurrentTargetMode(),
 		hitboxEnabled = hitboxEnabled,
 	}
 	settingsStatus.Text = getText("settings_saved")
@@ -2367,6 +2483,20 @@ aimPartToggle.MouseButton1Click:Connect(function()
 	aimPartToggle.Text = string.format(getText("aim_part"), getAimPartLabel())
 end)
 
+targetModeToggle.MouseButton1Click:Connect(function()
+	targetModeIndex = targetModeIndex + 1
+	if targetModeIndex > #targetModes then
+		targetModeIndex = 1
+	end
+	targetModeToggle.Text = string.format(getText("target_mode"), getTargetModeLabel())
+	if locatorEnabled then
+		setLocatorEnabled(true, pvpStatus)
+	end
+	if autoAimEnabled then
+		setAutoAim(true, pvpStatus)
+	end
+end)
+
 hitboxToggle.MouseButton1Click:Connect(function()
 	hitboxEnabled = not hitboxEnabled
 	if hitboxEnabled then
@@ -2378,8 +2508,8 @@ hitboxToggle.MouseButton1Click:Connect(function()
 end)
 
 pingButton.MouseButton1Click:Connect(function()
-	local target, distanceOrError = getNearestPlayer()
-	if not target then
+	local targetInfo, distanceOrError = getNearestTarget()
+	if not targetInfo then
 		if distanceOrError then
 			pvpStatus.Text = distanceOrError
 		else
@@ -2388,13 +2518,13 @@ pingButton.MouseButton1Click:Connect(function()
 		return
 	end
 
-	local head = getHeadPart(target)
+	local head = targetInfo.part
 	if not head then
 		setPvpStatus("status_target_fail")
 		return
 	end
 
-	setPvpStatus("status_nearest", target.Name, distanceOrError)
+	setPvpStatus("status_nearest", targetInfo.name, distanceOrError)
 	if setclipboard then
 		setclipboard(string.format("CFrame.new(%.2f, %.2f, %.2f)", head.Position.X, head.Position.Y, head.Position.Z))
 	end
